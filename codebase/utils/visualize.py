@@ -38,8 +38,10 @@ def plot_nms(image, gt_boxes, original_bboxes, filtered_bboxes, iou_threshold):
     plt.tight_layout()
     plt.show()
 
-def plot_detections_vs_groundtruth(detections, ground_truth, image, bounding_boxes, input_points, prompt, threshold, epoch, img_name, output_path, mode):
+def plot_detections_vs_groundtruth(detections, ground_truth, image, bounding_boxes, threshold, epoch, img_name, output_path, mode):
     """
+       Detections and ground_truth numpy array (n_objects, 256, 256)
+       Image torch tensor (256,256,3)
        Plots original image, ground truth, input_prompt, predictions, and TP,FP
        """
     num_objects = ground_truth.shape[0]  # Number of objects
@@ -79,16 +81,11 @@ def plot_detections_vs_groundtruth(detections, ground_truth, image, bounding_box
     axs[2].set_title("Ground Truth with Input Prompt")
     axs[2].axis('off')
 
-    if prompt == "bounding_boxes":
     # Draw bounding boxes on the combined ground truth mask
-        for box in bounding_boxes:
-            rect = patches.Rectangle((box[0], box[1]), box[2] - box[0], box[3] - box[1],
-                                     linewidth=2, edgecolor='red', facecolor='none')
-            axs[2].add_patch(rect)
-
-    elif prompt == "input_points":
-        axs[2].scatter(input_points[:, 1], input_points[:, 0], cmap='viridis', marker='o', edgecolors='red', s=20,
-                       alpha=0.7)
+    for box in bounding_boxes:
+        rect = patches.Rectangle((box[0], box[1]), box[2] - box[0], box[3] - box[1],
+                                 linewidth=2, edgecolor='red', facecolor='none')
+        axs[2].add_patch(rect)
 
     # Combine predicted masks for visualization (assign same colors)
     detections = (detections > 0.5).astype(np.uint8)

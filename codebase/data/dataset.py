@@ -90,6 +90,10 @@ class SegDataset(TorchDataset):
         instance_masks = []
         bounding_boxes = []
 
+        if len(object_ids) == 0:
+            print(f"[INFO] No objects found in mask: {path}")
+            return None
+
         for obj_id in object_ids:
             instance_mask = np.where(mask == obj_id, 1, 0)  # Create binary mask for each object
             instance_masks.append(instance_mask)
@@ -133,6 +137,12 @@ class SegDataset(TorchDataset):
 
 def custom_collate_fn(batch):
     # Collate images
+    batch = [item for item in batch if item is not None]
+
+    # If after removing None, the batch is empty, return None (skip this batch)
+    if len(batch) == 0:
+        return None
+
     images = torch.stack([item['image'] for item in batch])
     pixel_values = torch.stack([item['pixel_values'] for item in batch])
     original_masks = torch.stack([item['original_mask'] for item in batch])

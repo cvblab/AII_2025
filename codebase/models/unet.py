@@ -129,11 +129,15 @@ def train_unet(DEVICE, train_data, num_epochs, threshold, output_path):
         for batch_index, batch in enumerate(train_data):
             batch_loss = 0
 
+            if batch is None or len(batch["image"]) == 0:
+                print(f"Skipping empty batch {batch_index}.")
+                continue
 
             for item_index in range(len(batch["image"])):
                 pred_masks = []
                 num_objects = batch['num_objects_per_image'][item_index]
                 print(num_objects)
+
                 img_name = str(batch['path'][item_index]).split("\\")[1]
                 valid_bboxes = batch["bounding_boxes"][item_index][:num_objects]
                 valid_gt_masks = batch['instance_gt_masks'][item_index][:num_objects].float()

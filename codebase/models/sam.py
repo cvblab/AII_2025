@@ -12,20 +12,27 @@ import matplotlib.patches as patches
 from codebase.utils.metrics import calculate_metrics,  average_precision
 from codebase.utils.visualize import plot_ap,plot_detections_vs_groundtruth,plot_loss
 from predict_instance_segmentation import stardist_centroids
+from codebase.utils.test_utils import yolo_bboxes, nms
 import torch.nn as nn
 import monai
 import sys
+import pandas as pd
 
-def predict_masks(DEVICE, model, image, bboxes) -> np.ndarray:
+def predict_masks(DEVICE, model, model_processor, image, bboxes, test=False):
     result_masks = []
 
     for idx, box in enumerate(bboxes):
 
         print(f"\r{idx + 1}/{len(bboxes)}", end=" ")
         sys.stdout.flush()
-        processor = AutoProcessor.from_pretrained("facebook/sam-vit-base")
-        inputs = processor(images=image, input_boxes=[[box.tolist()]], return_tensors="pt").to(DEVICE)
-        outputs = model(**inputs)
+        inputs = model_processor(images=image, input_boxes=[[box.tolist()]], return_tensors="pt").to(DEVICE)
+
+        if test == True:
+            with torch.no_grad():
+                outputs = model(**inputs)
+
+        else:
+            outputs = model(**inputs)
         pred_mask = outputs["pred_masks"].squeeze()
         result_masks.append(pred_mask)
 
@@ -50,7 +57,7 @@ def pad_predictions(gt_masks, pred_masks):
 
 
 def train_sam(DEVICE, train_data, num_epochs, threshold, output_path):
-    model,optimizer, bce_loss_fn, seg_loss = get_sam_model(DEVICE)
+    model,model_processor, optimizer, bce_loss_fn, seg_loss = get_sam_model(DEVICE)
     print("Training SAM")
     last_model_path = f'{output_path}/weights/last.pth'
     best_model_path = f'{output_path}/weights/best.pth'
@@ -68,6 +75,10 @@ def train_sam(DEVICE, train_data, num_epochs, threshold, output_path):
         for batch_index, batch in enumerate(train_data):
             batch_loss = 0
 
+            if batch is None or len(batch["image"]) == 0:
+                print(f"Skipping empty batch {batch_index}.")
+                continue
+
             for item_index in range(len(batch["image"])):
                 num_objects = batch['num_objects_per_image'][item_index]
                 img_name = str(batch['path'][item_index]).split("\\")[1]
@@ -75,7 +86,7 @@ def train_sam(DEVICE, train_data, num_epochs, threshold, output_path):
                 valid_gt_masks = batch['instance_gt_masks'][item_index][:num_objects].float().to(DEVICE)
 
 
-                pred_masks = predict_masks(DEVICE, model,batch["image"][item_index].to(DEVICE),
+                pred_masks = predict_masks(DEVICE, model, model_processor, batch["image"][item_index].to(DEVICE),
                                            valid_bboxes).to(DEVICE)
 
                 if pred_masks.shape[0] != valid_gt_masks.shape[0]:
@@ -136,8 +147,73 @@ def train_sam(DEVICE, train_data, num_epochs, threshold, output_path):
         plot_ap(average_precisions_list, epoch, output_path)
 
 
+def test_sam(DEVICE, test_data, model_path, tp_thresholds, nms_iou_threshold):
+    model, model_processor, optimizer, bce_loss_fn, seg_loss = get_sam_model(DEVICE)
+    print("Testing SAM")
+
+    state_dict = torch.load(model_path, map_location="cuda" if torch.cuda.is_available() else "cpu")
+    model.load_state_dict(state_dict)
+    model.to(DEVICE)
+    model.eval()
+    all_APs = []
+    all_aps_per_threshold = {threshold: [] for threshold in tp_thresholds}
+
+    for index, test_sample in enumerate(test_data):
+        gt_bboxes = test_sample["bounding_boxes"].squeeze(0)
+        gt_masks = test_sample['instance_gt_masks'].squeeze(0).float().to(DEVICE)
+        #centroids = stardist_centroids(test_sample["image"])
+
+        yolo_boxes, confs = yolo_bboxes(test_sample["image"])
+        keep_indices = nms(yolo_boxes, confs, iou_threshold=nms_iou_threshold)
+        yolo_boxes_nms = yolo_boxes[keep_indices.long()]
+
+
+        pred_masks = predict_masks(DEVICE, model, model_processor, test_sample["image"].to(DEVICE), bboxes=yolo_boxes_nms, test=True).to(DEVICE)
+        # TP, FP, FN = calculate_metrics(pred_masks.detach().cpu().numpy(), gt_masks.cpu().numpy(), threshold=tp_threshold)
+        # AP = average_precision(TP, FP, FN)
+        # print(f"Real number of cells:{gt_masks.shape[0]}, Number of detections:{pred_masks.shape[0]}, AP: {AP}, TP: {TP}, FP: {FP}, FN: {FN}")
+        # all_APs.append(AP)
+
+        for threshold in tp_thresholds:
+            TP, FP, FN = calculate_metrics(pred_masks.detach().cpu().numpy(), gt_masks.cpu().numpy(),
+                                           threshold=threshold)
+            AP = average_precision(TP, FP, FN)
+            all_aps_per_threshold[threshold].append(AP)  # Store AP for this threshold
+            print(f"Sample {index}, IoU Threshold: {threshold}, AP: {AP}, TP: {TP}, FP: {FP}, FN: {FN}")
+        #
+       #  plot_single_detections_vs_groundtruth(
+       #      detections=pred_masks.detach().cpu().numpy(),
+       #      ground_truth=gt_masks.cpu().numpy(),
+       #      image=test_sample["image"].squeeze(0),
+       #      bounding_boxes=yolo_boxes.cpu().numpy(),
+       #      input_points=centroids,
+       #      prompt=prompt,
+       #      threshold=tp_threshold
+       #  )
+       # #
+        plot_detections_vs_groundtruth(
+           detections=pred_masks.detach().cpu().numpy(),
+           ground_truth=gt_masks.cpu().numpy(),
+           image=test_sample["image"].squeeze(0),
+           bounding_boxes=yolo_boxes_nms.cpu().numpy(),
+           threshold=0.7,
+           epoch=0,
+           img_name="",
+           output_path = "",
+           mode = "test"
+        )
+    # Compute mean AP across all samples for each threshold
+    mean_aps = {threshold: np.mean(aps) for threshold, aps in all_aps_per_threshold.items()}
+
+    mean_ap_df = pd.DataFrame(list(mean_aps.items()), columns=["IoU Threshold", "Mean AP"])
+
+    # Print the DataFrame
+    print(mean_ap_df)
+
+
 def get_sam_model(DEVICE):
     model = SamModel.from_pretrained("facebook/sam-vit-base")
+    model_processor = AutoProcessor.from_pretrained("facebook/sam-vit-base")
     for name, param in model.named_parameters():
         if name.startswith(("vision_encoder", "prompt_encoder","image_encoder")):
             param.requires_grad_(False)
@@ -146,13 +222,10 @@ def get_sam_model(DEVICE):
     optimizer = torch.optim.Adam(model.mask_decoder.parameters(), lr=1e-5, weight_decay=0)
     bce_loss_fn = nn.BCEWithLogitsLoss()
     seg_loss = monai.losses.DiceCELoss(sigmoid=True, squared_pred=True, reduction='mean')
-    # state_dict = torch.load("results/training/dsb18/weights/sam_model_dsb_best.pth",
-    #                         map_location="cuda" if torch.cuda.is_available() else "cpu")
-    # model.load_state_dict(state_dict)
     model.to(DEVICE)
     model.train()
 
-    return model, optimizer, bce_loss_fn, seg_loss
+    return model, model_processor, optimizer, bce_loss_fn, seg_loss
 
 
 

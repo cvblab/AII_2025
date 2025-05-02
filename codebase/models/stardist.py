@@ -8,7 +8,13 @@ from tifffile import imread
 from csbdeep.utils import Path, normalize
 from stardist import fill_label_holes, random_label_cmap, calculate_extents, gputools_available
 from stardist.models import Config2D, StarDist2D
+from stardist import random_label_cmap, _draw_polygons
+from codebase.utils.metrics import calculate_metrics,  average_precision
+from codebase.utils.visualize import plot_ap,plot_detections_vs_groundtruth,plot_loss
 from stardist.matching import matching_dataset
+import pandas as pd
+
+lbl_cmap = random_label_cmap()
 
 def split_data(X, Y, val_split=0.15):
     """
@@ -27,6 +33,13 @@ def split_data(X, Y, val_split=0.15):
     print('- Validation:     %3d' % len(X_val))
 
     return X_trn, Y_trn, X_val, Y_val
+
+def label_to_binary_masks(label_image):
+    ids = np.unique(label_image)
+    ids = ids[ids != 0]  # remove background
+    masks = np.stack([(label_image == i).astype(np.uint8) for i in ids], axis=0)
+    return masks  # Shape: (num_objects, H, W)
+
 
 def train_stardist(DEVICE, train_data, num_epochs, threshold, output_path):
     """
@@ -65,3 +78,60 @@ def train_stardist(DEVICE, train_data, num_epochs, threshold, output_path):
     model.train(X_trn, Y_trn, validation_data=(X_val, Y_val), epochs=200, steps_per_epoch=24)
 
     return model
+
+def test_stardist(DEVICE, test_data, tp_thresholds):
+    model = StarDist2D(None, name="stardist_fluorescence", basedir="../weights/")
+    #model = StarDist2D.from_pretrained('2D_paper_dsb2018')
+    all_APs = []
+    all_aps_per_threshold = {threshold: [] for threshold in tp_thresholds}
+
+    for index, test_sample in enumerate(test_data):
+        img = test_sample["image"].squeeze()
+        grayscale_image = img.permute(2, 0, 1).float().mean(dim=0)
+        axis_norm = (0, 1)  # normalize channels independently
+        image = normalize(grayscale_image.numpy(), 1, 99.8, axis=axis_norm)
+        gt_mask = test_sample['original_gt_masks'].squeeze().numpy()
+
+        labels, details = model.predict_instances(image)
+
+        print("Detected cells:", len(np.unique(labels)))
+        print("Groundtruth cells:", len(np.unique(gt_mask)))
+
+        # Collect all unique label IDs from both masks
+        all_labels = np.unique(np.concatenate((np.unique(test_sample['original_gt_masks'].squeeze().numpy()), np.unique(labels))))
+        num_labels = all_labels.max() + 1  # Ensure we include all label indices
+
+        # Create a consistent colormap
+        cmap = plt.get_cmap('nipy_spectral', num_labels)
+
+        # Plot side-by-side comparison with shared colormap
+        fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+
+        im0 = axes[0].imshow(gt_mask, cmap=cmap, vmin=0, vmax=num_labels - 1)
+        axes[0].set_title('Ground Truth Mask')
+        axes[0].axis('off')
+
+        im1 = axes[1].imshow(labels, cmap=cmap, vmin=0, vmax=num_labels - 1)
+        axes[1].set_title('Predicted Labels')
+        axes[1].axis('off')
+
+        plt.tight_layout()
+        plt.show()
+
+        det_masks = label_to_binary_masks(labels)
+        gt_masks = label_to_binary_masks(gt_mask)
+
+        for threshold in tp_thresholds:
+            TP, FP, FN = calculate_metrics(det_masks, gt_masks,
+                                           threshold=threshold)
+            AP = average_precision(TP, FP, FN)
+            all_aps_per_threshold[threshold].append(AP)
+            print(f"Sample {index}, IoU Threshold: {threshold}, AP: {AP}, TP: {TP}, FP: {FP}, FN: {FN}")
+
+        # Compute mean AP across all samples for each threshold
+    mean_aps = {threshold: np.mean(aps) for threshold, aps in all_aps_per_threshold.items()}
+
+    mean_ap_df = pd.DataFrame(list(mean_aps.items()), columns=["IoU Threshold", "Mean AP"])
+
+    # Print the DataFrame
+    print(mean_ap_df)
