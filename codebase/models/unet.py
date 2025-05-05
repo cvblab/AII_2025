@@ -174,6 +174,10 @@ def train_unet(DEVICE, train_data, num_epochs, threshold, output_path):
                     with tf.GradientTape() as tape:
                         batched_cells_predictions = model(input_sub_batch,
                                                           training=True)  # Obtain predictions for a sub-batch
+
+                        print("Pred min:", tf.reduce_min(batched_cells_predictions).numpy(),
+                              "max:", tf.reduce_max(batched_cells_predictions).numpy())
+
                         visualize_samples(input_tensor=input_sub_batch, gt_masks=masks_sub_batch,
                                           preds=batched_cells_predictions, num_samples=8)
 
@@ -188,36 +192,6 @@ def train_unet(DEVICE, train_data, num_epochs, threshold, output_path):
 
                 #total_loss_epoch += total_loss_image  # Add image loss to epoch loss
                 batch_loss += total_loss_image
-
-                # with tf.GradientTape() as tape:
-                #     total_loss_image = 0
-                #     pred_masks = []
-                #
-                #     for j in range(0, len(img_and_bboxes), sub_batch_size):
-                #         input_sub_batch = img_and_bboxes[j:j + sub_batch_size]
-                #         masks_sub_batch = valid_gt_masks[j:j + sub_batch_size]
-                #
-                #         batched_cells_predictions = model(input_sub_batch, training=True)
-                #         visualize_samples(input_tensor=input_sub_batch, gt_masks=masks_sub_batch,
-                #                           preds=batched_cells_predictions, num_samples=8)
-                #
-                #         loss = tf.keras.losses.binary_crossentropy(masks_sub_batch, batched_cells_predictions)
-                #         mini_batch_loss = tf.reduce_mean(loss)
-                #         total_loss_image += mini_batch_loss  # accumulate total loss (as a Tensor)
-                #
-                #         pred_masks.append(batched_cells_predictions)
-                #
-                #     # Compute gradients after all sub-batches
-                #     gradients = tape.gradient(total_loss_image, model.trainable_variables)
-                #
-                #     for var, grad in zip(model.trainable_variables, gradients):
-                #         print(
-                #             f"Gradient for {var.name}: mean = {tf.reduce_mean(grad)}, std = {tf.math.reduce_std(grad)}")
-                #     optimizer.apply_gradients(zip(gradients, model.trainable_variables))
-                #
-                #     total_loss_image_value = total_loss_image.numpy()
-                #     batch_loss += total_loss_image_value
-
                 pred_masks = [torch.from_numpy(p.numpy()).squeeze(-1) for p in pred_masks]  # Now shape [N, 256, 256]
                 # # Now you can concatenate
                 pred_masks = torch.cat(pred_masks, dim=0)
@@ -281,8 +255,10 @@ import matplotlib.pyplot as plt
 def visualize_samples(input_tensor, gt_masks, preds, num_samples=3):
     if tf.is_tensor(input_tensor):
         input_tensor = input_tensor.numpy()
-    if torch.is_tensor(gt_masks):
-        gt_masks = gt_masks.cpu().numpy()
+    if tf.is_tensor(gt_masks):
+        gt_masks = gt_masks.numpy()
+    if tf.is_tensor(preds):
+        preds = preds.numpy()
 
     for i in range(min(num_samples, len(input_tensor))):
         image = input_tensor[i, :, :, 0]
@@ -290,7 +266,10 @@ def visualize_samples(input_tensor, gt_masks, preds, num_samples=3):
         gt_mask = gt_masks[i]
         pred = preds[i]
 
-        fig, axs = plt.subplots(1, 4, figsize=(12, 4))
+        # Apply threshold to predictions to get binary mask for values above 0.5
+        pred_above_05 = (pred > 0.5).astype(float)
+
+        fig, axs = plt.subplots(1, 5, figsize=(15, 4))  # Now 5 plots
 
         axs[0].imshow(image, cmap='gray')
         axs[0].set_title(f"Image {i + 1}")
@@ -305,8 +284,12 @@ def visualize_samples(input_tensor, gt_masks, preds, num_samples=3):
         axs[2].axis('off')
 
         axs[3].imshow(pred, cmap='Greens')
-        axs[3].set_title("pred")
+        axs[3].set_title("Prediction")
         axs[3].axis('off')
+
+        axs[4].imshow(pred_above_05, cmap='Blues')
+        axs[4].set_title("Pred > 0.5")
+        axs[4].axis('off')
 
         plt.tight_layout()
         plt.show()

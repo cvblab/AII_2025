@@ -144,6 +144,51 @@ def plot_detections_vs_groundtruth(detections, ground_truth, image, bounding_box
     # else:
     plt.show()
 
+def visualize_single_cells(input_tensor, gt_masks, preds):
+    if torch.is_tensor(input_tensor):
+        input_tensor = input_tensor.cpu().numpy()
+    if torch.is_tensor(gt_masks):
+        gt_masks = gt_masks.cpu().numpy()
+    if torch.is_tensor(preds):
+        preds = preds.cpu().detach().numpy()
+
+    for i in range(len(input_tensor)):
+        image = input_tensor[i, 0, :, :]  # First channel: grayscale image
+        bbox_mask = input_tensor[i, 1, :, :]  # Second channel: bbox mask
+
+        gt_mask = gt_masks[i]
+        pred = preds[i]
+
+        # Apply threshold to the predictions (only values > 0.5 will be shown)
+        pred_thresholded = (pred > 0.5).astype(np.float32)
+
+        fig, axs = plt.subplots(1, 5, figsize=(12, 4))
+
+        axs[0].imshow(image, cmap='gray')
+        axs[0].set_title(f"Image {i + 1}")
+        axs[0].axis('off')
+
+        axs[1].imshow(bbox_mask, cmap='Reds')
+        axs[1].set_title("BBox Mask")
+        axs[1].axis('off')
+
+        axs[2].imshow(gt_mask, cmap='Greens')
+        axs[2].set_title("GT Mask")
+        axs[2].axis('off')
+
+        # Displaying the thresholded prediction
+        axs[3].imshow(pred, cmap='Greens')
+        axs[3].set_title("Pred")
+        axs[3].axis('off')
+
+        # Displaying the thresholded prediction
+        axs[4].imshow(pred_thresholded, cmap='Greens')
+        axs[4].set_title("Pred > 0.5")
+        axs[4].axis('off')
+
+        plt.tight_layout()
+        plt.show()
+
 
 def plot_loss(epoch_losses_list,num_epochs,output_path):
     # Plot the metrics after training

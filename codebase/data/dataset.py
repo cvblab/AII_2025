@@ -122,7 +122,7 @@ class SegDataset(TorchDataset):
 
         nested_bounding_boxes = [bbox.flatten().tolist() for bbox in bounding_boxes]  # List of boxes for each object
 
-        inputs = self.processor(image, input_boxes=[nested_bounding_boxes], return_tensors="pt")
+        inputs = self.processor(image, input_boxes=[nested_bounding_boxes], return_tensors="pt",do_rescale=False)
         inputs = {k: v.squeeze(0) for k, v in inputs.items()}
 
         return {

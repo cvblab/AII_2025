@@ -24,7 +24,7 @@ if __name__ == "__main__":
     print(torch.version.cuda)
     print("torch version:", torch.__version__)
 
-    data = "mixed" # fluo  dsb  mixed  breast
+    data = "dsb" # fluo  dsb  mixed  breast
     if data == "dsb":
         images_path = "../datasets/dsb2018/train/images/*.tif"
         masks_path = "../datasets/dsb2018/train/masks/*.tif"
@@ -53,9 +53,9 @@ if __name__ == "__main__":
     train_dataset = SegDataset(dataset=dataset, processor=processor)
     train_data = DataLoader(train_dataset, batch_size=2, shuffle=True, collate_fn=custom_collate_fn)
 
-    model_type = "unet"  # or "unet", "stardist" "sam"
+    model_type = "unett"  # or "unet", "stardist" "sam"
     num_epochs = 5
-    threshold = 0.7
+    threshold = 0.4
     output_path = "../logs/training/" + data + "/" + model_type
 
     if model_type == "sam":

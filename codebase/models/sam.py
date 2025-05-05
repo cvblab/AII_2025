@@ -12,7 +12,7 @@ import matplotlib.patches as patches
 from codebase.utils.metrics import calculate_metrics,  average_precision
 from codebase.utils.visualize import plot_ap,plot_detections_vs_groundtruth,plot_loss
 from predict_instance_segmentation import stardist_centroids
-from codebase.utils.test_utils import yolo_bboxes, nms
+from codebase.utils.test_utils import yolo_bboxes, nms, pad_predictions
 import torch.nn as nn
 import monai
 import sys
@@ -38,22 +38,6 @@ def predict_masks(DEVICE, model, model_processor, image, bboxes, test=False):
 
     result_masks = torch.stack(result_masks)[:, 0, :, :].float()
     return result_masks
-
-
-def pad_predictions(gt_masks, pred_masks):
-    pred_num_objects = pred_masks.shape[0]
-    gt_num_objects = gt_masks.shape[0]
-
-    if pred_num_objects < gt_num_objects:
-        # If there are fewer predicted objects, pad pred_masks to match ground truth
-        padding = gt_num_objects - pred_num_objects
-        padding_tensor = torch.zeros((padding, *pred_masks.shape[1:]), device=pred_masks.device)
-        pred_masks = torch.cat([pred_masks, padding_tensor], dim=0)
-    elif pred_num_objects > gt_num_objects:
-        # If there are more predicted objects, trim pred_masks to match ground truth
-        pred_masks = pred_masks[:gt_num_objects]
-
-    return pred_masks
 
 
 def train_sam(DEVICE, train_data, num_epochs, threshold, output_path):

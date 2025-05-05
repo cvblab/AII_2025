@@ -70,3 +70,19 @@ def yolo_bboxes(image):
     boxes = results[0].boxes.xyxy
     confidence = results[0].boxes.conf
     return boxes, confidence
+
+
+def pad_predictions(gt_masks, pred_masks):
+    pred_num_objects = pred_masks.shape[0]
+    gt_num_objects = gt_masks.shape[0]
+
+    if pred_num_objects < gt_num_objects:
+        # If there are fewer predicted objects, pad pred_masks to match ground truth
+        padding = gt_num_objects - pred_num_objects
+        padding_tensor = torch.zeros((padding, *pred_masks.shape[1:]), device=pred_masks.device)
+        pred_masks = torch.cat([pred_masks, padding_tensor], dim=0)
+    elif pred_num_objects > gt_num_objects:
+        # If there are more predicted objects, trim pred_masks to match ground truth
+        pred_masks = pred_masks[:gt_num_objects]
+
+    return pred_masks
