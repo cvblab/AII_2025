@@ -15,11 +15,7 @@ from .sam import pad_predictions
 import numpy as np
 import matplotlib.patches as patches
 from codebase.utils.metrics import calculate_metrics,  average_precision
-from codebase.utils.visualize import plot_ap,plot_detections_vs_groundtruth,plot_loss
-from predict_instance_segmentation import stardist_centroids
-import torch.nn as nn
-import monai
-import sys
+
 
 def unet_model(input_shape, num_classes):
     """
@@ -249,8 +245,6 @@ def train_unet(DEVICE, train_data, num_epochs, threshold, output_path):
     model.save(save_path_keras)
     print(f"Model saved to {save_path_keras}")
 
-
-import matplotlib.pyplot as plt
 
 def visualize_samples(input_tensor, gt_masks, preds, num_samples=3):
     if tf.is_tensor(input_tensor):

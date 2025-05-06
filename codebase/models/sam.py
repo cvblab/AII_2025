@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib.patches as patches
 from codebase.utils.metrics import calculate_metrics,  average_precision
-from codebase.utils.visualize import plot_ap,plot_detections_vs_groundtruth,plot_loss
+from codebase.utils.visualize import plot_ap,plot_detections_vs_groundtruth,plot_loss, calculate_bbox_accuracy
 from predict_instance_segmentation import stardist_centroids
 from codebase.utils.test_utils import yolo_bboxes, nms, pad_predictions
 import torch.nn as nn
@@ -145,18 +145,14 @@ def test_sam(DEVICE, test_data, model_path, tp_thresholds, nms_iou_threshold):
     for index, test_sample in enumerate(test_data):
         gt_bboxes = test_sample["bounding_boxes"].squeeze(0)
         gt_masks = test_sample['instance_gt_masks'].squeeze(0).float().to(DEVICE)
-        #centroids = stardist_centroids(test_sample["image"])
 
         yolo_boxes, confs = yolo_bboxes(test_sample["image"])
         keep_indices = nms(yolo_boxes, confs, iou_threshold=nms_iou_threshold)
         yolo_boxes_nms = yolo_boxes[keep_indices.long()]
-
-
+        print(f"Number of gt cells: {len(gt_bboxes)}")
+        print(f"Number of predicted cells: {len(yolo_boxes_nms)}")
+        calculate_bbox_accuracy(gt_bboxes, yolo_boxes_nms, iou_threshold=0.5)
         pred_masks = predict_masks(DEVICE, model, model_processor, test_sample["image"].to(DEVICE), bboxes=yolo_boxes_nms, test=True).to(DEVICE)
-        # TP, FP, FN = calculate_metrics(pred_masks.detach().cpu().numpy(), gt_masks.cpu().numpy(), threshold=tp_threshold)
-        # AP = average_precision(TP, FP, FN)
-        # print(f"Real number of cells:{gt_masks.shape[0]}, Number of detections:{pred_masks.shape[0]}, AP: {AP}, TP: {TP}, FP: {FP}, FN: {FN}")
-        # all_APs.append(AP)
 
         for threshold in tp_thresholds:
             TP, FP, FN = calculate_metrics(pred_masks.detach().cpu().numpy(), gt_masks.cpu().numpy(),
@@ -164,17 +160,7 @@ def test_sam(DEVICE, test_data, model_path, tp_thresholds, nms_iou_threshold):
             AP = average_precision(TP, FP, FN)
             all_aps_per_threshold[threshold].append(AP)  # Store AP for this threshold
             print(f"Sample {index}, IoU Threshold: {threshold}, AP: {AP}, TP: {TP}, FP: {FP}, FN: {FN}")
-        #
-       #  plot_single_detections_vs_groundtruth(
-       #      detections=pred_masks.detach().cpu().numpy(),
-       #      ground_truth=gt_masks.cpu().numpy(),
-       #      image=test_sample["image"].squeeze(0),
-       #      bounding_boxes=yolo_boxes.cpu().numpy(),
-       #      input_points=centroids,
-       #      prompt=prompt,
-       #      threshold=tp_threshold
-       #  )
-       # #
+
         plot_detections_vs_groundtruth(
            detections=pred_masks.detach().cpu().numpy(),
            ground_truth=gt_masks.cpu().numpy(),

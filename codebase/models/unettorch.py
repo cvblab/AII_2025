@@ -8,27 +8,17 @@ from PIL import Image
 import numpy as np
 from tqdm import tqdm
 import torch
-from skimage.filters.rank import threshold
-from torch.utils.data import DataLoader
-from transformers import SamProcessor, SamModel, AutoModel, AutoProcessor
-from codebase.data.dataset import SegDataset, create_dataset, custom_collate_fn
-from codebase.data.preprocess import augment_dataset_with_original, augmenter
-from segment_anything import sam_model_registry, SamPredictor
+import pandas as pd
 import os
-import matplotlib.pyplot as plt
 import numpy as np
-import matplotlib.patches as patches
 from codebase.utils.metrics import calculate_metrics,  average_precision
 from codebase.utils.test_utils import pad_predictions
-from codebase.utils.visualize import plot_ap,plot_detections_vs_groundtruth,plot_loss, visualize_single_cells
+from codebase.utils.visualize import plot_ap,plot_detections_vs_groundtruth,plot_loss, visualize_single_cells, calculate_bbox_accuracy
 import torch.nn as nn
-import monai
-import sys
+from codebase.utils.test_utils import yolo_bboxes, nms, pad_predictions
 from torchvision.transforms.functional import rgb_to_grayscale
 import segmentation_models_pytorch as smp
-from torch.utils.data import DataLoader
 from tqdm import tqdm
-import matplotlib.pyplot as plt
 
 
 def create_bbox_mask(image_shape, bbox):
@@ -85,20 +75,16 @@ def train_unett(DEVICE, train_data, num_epochs, threshold, output_path):
             batch_loss = 0
 
             for item_index in range(len(batch["image"])):
-                pred_masks = []
                 num_objects = batch['num_objects_per_image'][item_index]
                 img_name = str(batch['path'][item_index]).split("\\")[-1]
                 valid_bboxes = batch["bounding_boxes"][item_index][:num_objects]
                 valid_gt_masks = batch['instance_gt_masks'][item_index][:num_objects].float().unsqueeze(-1).to(DEVICE)
-
                 img_and_bboxes = []
 
                 for bbox in valid_bboxes:
                     bbox_mask = torch.tensor(create_bbox_mask(batch["image"][item_index].shape[:2], bbox)).unsqueeze(0)
-
                     img_gray = rgb_to_grayscale(batch["image"][item_index].permute(2, 0, 1))  # [C=1, H, W]
                     img_plus_bbox = torch.cat([img_gray, bbox_mask], dim=0)  # [2, H, W]
-
                     img_and_bboxes.append(img_plus_bbox)
 
                 img_and_bboxes = torch.stack(img_and_bboxes).to(DEVICE)
@@ -165,7 +151,7 @@ def train_unett(DEVICE, train_data, num_epochs, threshold, output_path):
                     ground_truth=valid_gt_masks.cpu().numpy().squeeze(),
                     image=batch["image"][item_index],
                     bounding_boxes=[],
-                    threshold=0.7,
+                    threshold=threshold,
                     epoch=0,
                     img_name="",
                     output_path="",
@@ -198,3 +184,76 @@ def train_unett(DEVICE, train_data, num_epochs, threshold, output_path):
         plot_loss(losses_list, epoch, output_path)
         plot_ap(average_precisions_list, epoch, output_path)
 
+def test_unet(DEVICE, test_data, model_path, tp_thresholds, nms_iou_threshold):
+    model, model_processor, optimizer, bce_loss_fn, seg_loss = get_unet(DEVICE)
+    print("Testing U-Net")
+
+    state_dict = torch.load(model_path, map_location="cuda" if torch.cuda.is_available() else "cpu")
+    model.load_state_dict(state_dict)
+    model.to(DEVICE)
+    model.eval()
+    all_APs = []
+    all_aps_per_threshold = {threshold: [] for threshold in tp_thresholds}
+    sub_batch_size = 8
+
+    for index, test_sample in enumerate(test_data):
+        gt_bboxes = test_sample["bounding_boxes"].squeeze(0)
+        gt_masks = test_sample['instance_gt_masks'].squeeze(0).float().to(DEVICE)
+
+        yolo_boxes, confs = yolo_bboxes(test_sample["image"])
+        keep_indices = nms(yolo_boxes, confs, iou_threshold=nms_iou_threshold)
+        yolo_boxes_nms = yolo_boxes[keep_indices.long()]
+        print(f"Number of gt cells: {len(gt_bboxes)}")
+        print(f"Number of predicted cells: {len(yolo_boxes_nms)}")
+        calculate_bbox_accuracy(gt_bboxes, yolo_boxes_nms, iou_threshold=0.5)
+        img_and_bboxes = []
+        pred_masks = []
+
+        for bbox in yolo_boxes_nms:
+            bbox_mask = torch.tensor(create_bbox_mask(test_sample["image"][index].shape[:2], bbox)).unsqueeze(0)
+            img_gray = rgb_to_grayscale(test_sample["image"][index].permute(2, 0, 1))  # [C=1, H, W]
+            img_plus_bbox = torch.cat([img_gray, bbox_mask], dim=0)  # [2, H, W]
+            img_and_bboxes.append(img_plus_bbox)
+
+            # Iterate over sub-batches
+        for j in range(0, len(img_and_bboxes), sub_batch_size):
+            input_sub_batch = img_and_bboxes[j:j + sub_batch_size]
+            masks_sub_batch = gt_masks[j:j + sub_batch_size]
+
+            batched_cells_predictions = model(input_sub_batch.float())
+            batched_cells_predictions = batched_cells_predictions.permute(0, 2, 3, 1)
+
+            print("Pred min:", batched_cells_predictions.min(), "max:", batched_cells_predictions.max())
+            # probs = torch.sigmoid(batched_cells_predictions)
+
+            visualize_single_cells(input_tensor=input_sub_batch, gt_masks=masks_sub_batch,
+                                   preds=batched_cells_predictions)
+
+            pred_masks.extend(batched_cells_predictions.detach().cpu())
+
+        pred_masks = torch.stack(pred_masks)
+        for threshold in tp_thresholds:
+            TP, FP, FN = calculate_metrics(pred_masks.detach().cpu().numpy(), gt_masks.cpu().numpy(),
+                                           threshold=threshold)
+            AP = average_precision(TP, FP, FN)
+            all_aps_per_threshold[threshold].append(AP)  # Store AP for this threshold
+            print(f"Sample {index}, IoU Threshold: {threshold}, AP: {AP}, TP: {TP}, FP: {FP}, FN: {FN}")
+
+        plot_detections_vs_groundtruth(
+           detections=pred_masks.detach().cpu().numpy(),
+           ground_truth=gt_masks.cpu().numpy(),
+           image=test_sample["image"].squeeze(0),
+           bounding_boxes=yolo_boxes_nms.cpu().numpy(),
+           threshold=threshold,
+           epoch=0,
+           img_name="",
+           output_path = "",
+           mode = "test"
+        )
+    # Compute mean AP across all samples for each threshold
+    mean_aps = {threshold: np.mean(aps) for threshold, aps in all_aps_per_threshold.items()}
+
+    mean_ap_df = pd.DataFrame(list(mean_aps.items()), columns=["IoU Threshold", "Mean AP"])
+
+    # Print the DataFrame
+    print(mean_ap_df)
