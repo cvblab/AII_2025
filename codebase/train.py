@@ -53,13 +53,13 @@ if __name__ == "__main__":
     train_dataset = SegDataset(dataset=dataset, processor=processor)
     train_data = DataLoader(train_dataset, batch_size=2, shuffle=True, collate_fn=custom_collate_fn)
 
-    model_type = "unett"  # or "unet", "stardist" "sam"
+    model_type = "sam"  # or "unet", "stardist" "sam"
     num_epochs = 5
-    threshold = 0.4
+    threshold = 0.7
     output_path = "../logs/training/" + data + "/" + model_type
 
-    if model_type == "sam":
-        train_sam(DEVICE, train_data, num_epochs, threshold, output_path=output_path)
+    if model_type == "sam": # base large huge
+        train_sam(DEVICE, train_data, num_epochs, threshold, backbone="base", output_path=output_path)
     elif model_type == "unet":
         train_unet(DEVICE, train_data, num_epochs, threshold, output_path=output_path)
     elif model_type == "unett":

@@ -25,7 +25,7 @@ def predict_masks(DEVICE, model, model_processor, image, bboxes, test=False):
 
         print(f"\r{idx + 1}/{len(bboxes)}", end=" ")
         sys.stdout.flush()
-        inputs = model_processor(images=image, input_boxes=[[box.tolist()]], return_tensors="pt").to(DEVICE)
+        inputs = model_processor(images=image, input_boxes=[[box.tolist()]], return_tensors="pt",do_rescale=False).to(DEVICE)
 
         if test == True:
             with torch.no_grad():
@@ -40,8 +40,8 @@ def predict_masks(DEVICE, model, model_processor, image, bboxes, test=False):
     return result_masks
 
 
-def train_sam(DEVICE, train_data, num_epochs, threshold, output_path):
-    model,model_processor, optimizer, bce_loss_fn, seg_loss = get_sam_model(DEVICE)
+def train_sam(DEVICE, train_data, num_epochs, threshold, backbone, output_path):
+    model,model_processor, optimizer, bce_loss_fn, seg_loss = get_sam_model(DEVICE, backbone)
     print("Training SAM")
     last_model_path = f'{output_path}/weights/last.pth'
     best_model_path = f'{output_path}/weights/best.pth'
@@ -95,8 +95,6 @@ def train_sam(DEVICE, train_data, num_epochs, threshold, output_path):
                         ground_truth=valid_gt_masks.cpu().numpy(),
                         image=batch["image"][item_index],
                         bounding_boxes=batch["bounding_boxes"][item_index],
-                        input_points=[],
-                        prompt="bounding_boxes",
                         threshold=threshold,
                         epoch=epoch,
                         img_name=img_name,
@@ -131,8 +129,8 @@ def train_sam(DEVICE, train_data, num_epochs, threshold, output_path):
         plot_ap(average_precisions_list, epoch, output_path)
 
 
-def test_sam(DEVICE, test_data, model_path, tp_thresholds, nms_iou_threshold):
-    model, model_processor, optimizer, bce_loss_fn, seg_loss = get_sam_model(DEVICE)
+def test_sam(DEVICE, test_data, model_path, tp_thresholds, nms_iou_threshold, backbone):
+    model, model_processor, optimizer, bce_loss_fn, seg_loss = get_sam_model(DEVICE, backbone)
     print("Testing SAM")
 
     state_dict = torch.load(model_path, map_location="cuda" if torch.cuda.is_available() else "cpu")
@@ -181,9 +179,10 @@ def test_sam(DEVICE, test_data, model_path, tp_thresholds, nms_iou_threshold):
     print(mean_ap_df)
 
 
-def get_sam_model(DEVICE):
-    model = SamModel.from_pretrained("facebook/sam-vit-base")
-    model_processor = AutoProcessor.from_pretrained("facebook/sam-vit-base")
+def get_sam_model(DEVICE, backbone):
+    model_path = "facebook/sam-vit-" + backbone
+    model = SamModel.from_pretrained(model_path)
+    model_processor = AutoProcessor.from_pretrained(model_path)
     for name, param in model.named_parameters():
         if name.startswith(("vision_encoder", "prompt_encoder","image_encoder")):
             param.requires_grad_(False)
