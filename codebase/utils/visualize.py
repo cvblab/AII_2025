@@ -283,16 +283,7 @@ def calculate_bbox_accuracy(ground_truth_boxes, predicted_boxes, iou_threshold=0
     f1_score = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0
 
     print(f"Boxes: {len(ground_truth_boxes)}, TP: {TP}, FP: {FP}, FN: {FN}, Precision: {precision}, Recall: {recall}, F1: {f1_score}")
-    # return {
-    #     'TP': TP,
-    #     'FP': FP,
-    #     'FN': FN,
-    #     'precision': precision,
-    #     'recall': recall,
-    #     'f1_score': f1_score,
-    #     'tp_indices': tp_indices,
-    #     'fp_indices': fp_indices
-    # }
+    return TP,FP,FN,precision,recall,f1_score,tp_indices,fp_indices
 
 def plot_bboxes(image, gt_bboxes, pred_bboxes, tp_indices, fp_indices):
     """

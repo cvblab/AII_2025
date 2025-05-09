@@ -12,7 +12,7 @@ import matplotlib.patches as patches
 from codebase.utils.metrics import calculate_metrics,  average_precision
 from codebase.utils.visualize import plot_ap,plot_detections_vs_groundtruth,plot_loss, calculate_bbox_accuracy
 from predict_instance_segmentation import stardist_centroids
-from codebase.utils.test_utils import yolo_bboxes, nms, pad_predictions
+from codebase.utils.test_utils import get_yolo_bboxes, nms, pad_predictions
 import torch.nn as nn
 import monai
 import sys
@@ -144,7 +144,7 @@ def test_sam(DEVICE, test_data, model_path, tp_thresholds, nms_iou_threshold, ba
         gt_bboxes = test_sample["bounding_boxes"].squeeze(0)
         gt_masks = test_sample['instance_gt_masks'].squeeze(0).float().to(DEVICE)
 
-        yolo_boxes, confs = yolo_bboxes(test_sample["image"])
+        yolo_boxes, confs = get_yolo_bboxes(test_sample["image"])
         keep_indices = nms(yolo_boxes, confs, iou_threshold=nms_iou_threshold)
         yolo_boxes_nms = yolo_boxes[keep_indices.long()]
         print(f"Number of gt cells: {len(gt_bboxes)}")

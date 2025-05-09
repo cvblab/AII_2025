@@ -17,14 +17,7 @@ from codebase.utils.metrics import calculate_metrics, average_precision
 from codebase.utils.visualize import plot_detections_vs_groundtruth, plot_nms, calculate_bbox_accuracy, plot_bboxes
 from codebase.models.sam import test_sam
 from codebase.models.stardist import test_stardist
-import torch.nn as nn
-import monai
-from tifffile import imread
-import sys
-from ultralytics import YOLO
-import cv2
-from Stardist.stardist.models import StarDist2D
-import pandas as pd
+from codebase.models.unettorch import test_unet
 
 
 if __name__ == "__main__":
@@ -45,8 +38,8 @@ if __name__ == "__main__":
         masks_path = "../datasets/mixed_dataset/test/target/*.tif"
 
     elif data == "breast":
-        images_path = "../datasets/breast_cancer/Training dataset/Training_source/*.tif"
-        masks_path = "../datasets/breast_cancer/Training dataset/Training_target/*.tif"
+        images_path = "../datasets/breast_cancer/test/images/*.tif"
+        masks_path = "../datasets/breast_cancer/test/masks/*.tif"
 
     dataset = create_dataset(images_path, masks_path, preprocess=True, axis_norm=(0, 1))
     print("Acquiring images from " + data + " dataset.")
@@ -63,13 +56,11 @@ if __name__ == "__main__":
     threshold = 0.7
     nms_iou_threshold = 0.5
     tp_thresholds = [round(th, 2) for th in np.arange(0.5, 1.0, 0.05)]
-    model_path = "../weights/sam_model_dsb_best.pth"
+    model_path = "../weights/sam/sam_model_dsb_best.pth"
 
     if model_type == "sam":
-        test_sam(DEVICE, test_data, model_path, tp_thresholds, nms_iou_threshold)
-    # elif model_type == "unet":
-    #     test_unet(DEVICE, test_data, threshold, output_path=output_path)
-    # elif model_type == "unett":
-    #     test_unett(DEVICE, test_data, threshold, output_path=output_path)
+        test_sam(DEVICE, test_data, model_path, tp_thresholds, nms_iou_threshold, backbone="base")
+    elif model_type == "unet":
+        test_unet(DEVICE, test_data, model_path, tp_thresholds, nms_iou_threshold)
     elif model_type == "stardist":
         test_stardist(DEVICE, test_data,tp_thresholds)

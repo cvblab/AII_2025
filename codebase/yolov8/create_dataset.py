@@ -7,7 +7,7 @@ import torch
 from skimage.filters.rank import threshold
 from torch.utils.data import DataLoader
 from transformers import SamProcessor, SamModel, AutoModel, AutoProcessor
-from utils_file import SAMDataset, create_dataset, custom_collate_fn
+from codebase.data.dataset import SegDataset, create_dataset, custom_collate_fn
 import os
 import matplotlib.patches as patches
 
@@ -63,7 +63,8 @@ def save_labels(labels_output_path, images_output_path, image_file, image, bound
     if isinstance(image, torch.Tensor):
         image = image.numpy()  # Convert CHW to HWC
 
-    image = image.astype(np.uint8)  # Convert to uint8 for OpenCV
+    image = (image * 255).astype(np.uint8)
+ # Convert to uint8 for OpenCV
 
     # Set output path for the image (with .tiff extension)
     single_image_output_path = os.path.join(images_output_path, os.path.splitext(os.path.basename(image_file))[0] + '.tiff')
@@ -91,6 +92,8 @@ def save_labels(labels_output_path, images_output_path, image_file, image, bound
             # Write the class ID (assuming class 0) and normalized coordinates
             txt_file.write(f"0 {x_center_normalized} {y_center_normalized} {width_normalized} {height_normalized}\n")
 
+    print(f"Image min: {image.min()}, max: {image.max()}, shape: {image.shape}")
+
     # Draw bounding boxes on the image
     for box in bounding_boxes:
         x_min, y_min, x_max, y_max = map(int, box)
@@ -109,28 +112,34 @@ def save_labels(labels_output_path, images_output_path, image_file, image, bound
 
 if __name__ == "__main__":
 
-    images_path = "../datasets/fluorescence_dataset/train/patches/fluorescence/*.tif"  # Path to your images
-    masks_path = "../datasets/fluorescence_dataset/train/patches/masks/*.tif"
-    labels_output_path = "../datasets/yolo/train_fluo/labels"  # Path to save the txt files (create this directory)
-    images_output_path = "../datasets/yolo/train_fluo/images"
+    images_path = "../../datasets/breast_cancer/train/images/*.tif"  # Path to your images
+    masks_path = "../../datasets/breast_cancer/train/masks/*.tif"
+    labels_output_path = "data/train_breast/labels"  # Path to save the txt files (create this directory)
+    images_output_path = "data/train_breast/images"
 
     dataset = create_dataset(images_path, masks_path)
     processor = SamProcessor.from_pretrained("facebook/sam-vit-base")
-    train_dataset = SAMDataset(dataset=dataset, processor=processor)
+    train_dataset = SegDataset(dataset=dataset, processor=processor)
     train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=True, collate_fn=custom_collate_fn)
 
     os.makedirs(labels_output_path, exist_ok=True)
     os.makedirs(images_output_path, exist_ok=True)
 
+    print(len(train_dataloader))
+
     for batch_index, batch in enumerate(train_dataloader):
 
+        if batch is None or len(batch["image"]) == 0:
+            print(f"Skipping empty batch {batch_index}.")
+            continue
+
         plot_bboxes(
-            ground_truth=batch["single_instance_masks"][0],
-            image=batch["images"][0],
+            ground_truth=batch["instance_gt_masks"][0],
+            image=batch["image"][0],
             bounding_boxes=batch["bounding_boxes"][0]
         )
 
-        save_labels(labels_output_path,images_output_path, str(batch["path"][0]), batch["images"][0], batch["bounding_boxes"][0])
+        save_labels(labels_output_path,images_output_path, str(batch["path"][0]), batch["image"][0], batch["bounding_boxes"][0])
 
 
 

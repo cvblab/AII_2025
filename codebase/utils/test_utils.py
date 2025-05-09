@@ -38,8 +38,7 @@ def nms(boxes, scores, iou_threshold=0.5):
     return torch.tensor(keep)
 
 
-def yolo_bboxes(image):
-    weights_path = "../weights/yolov8n_dsb18.pt" # "runs/detect/yolov8n_dsb18/weights/best.pt" "runs/detect/yolov8n_fluo/weights/best.pt"
+def get_yolo_bboxes(image, weights_path="../weights/yolo/yolov8n_dsb18.pt"):
     model = YOLO(weights_path)
     image_resized = torch.tensor(image).permute(0,3,1,2)
     # Perform prediction on the image

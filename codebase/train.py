@@ -38,8 +38,8 @@ if __name__ == "__main__":
         masks_path = "../datasets/mixed_dataset/training/target/*.tif"
 
     elif data == "breast":
-        images_path = "../datasets/breast_cancer/Training dataset/Training_source/*.tif"
-        masks_path = "../datasets/breast_cancer/Training dataset/Training_target/*.tif"
+        images_path = "../../datasets/breast_cancer/train/images/*.tif"
+        masks_path = "../../datasets/breast_cancer/train/masks/*.tif"
 
     dataset = create_dataset(images_path, masks_path, preprocess=True, axis_norm=(0, 1))
     print("Acquiring images from "+ data + " dataset.")

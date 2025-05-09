@@ -10,7 +10,8 @@ from .preprocess import get_bounding_boxes, preprocess_data
 import cv2
 import os
 from csbdeep.utils import normalize
-from Stardist.stardist import fill_label_holes
+#from Stardist.stardist import fill_label_holes
+from codebase.Stardist.stardist import fill_label_holes
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
