@@ -10,7 +10,7 @@ from stardist import fill_label_holes, random_label_cmap, calculate_extents, gpu
 from stardist.models import Config2D, StarDist2D
 from stardist import random_label_cmap, _draw_polygons
 from codebase.utils.metrics import calculate_metrics,  average_precision
-from codebase.utils.visualize import plot_ap,plot_detections_vs_groundtruth,plot_loss
+from codebase.utils.visualize import plot_ap,plot_instance_segmentation,plot_loss
 from stardist.matching import matching_dataset
 import pandas as pd
 

@@ -37,7 +37,7 @@ def plot_nms(image, gt_boxes, original_bboxes, filtered_bboxes, iou_threshold):
     plt.tight_layout()
     plt.show()
 
-def plot_detections_vs_groundtruth(detections, ground_truth, image, bounding_boxes, threshold, epoch, img_name, output_path, mode):
+def plot_instance_segmentation(detections, ground_truth, image, bounding_boxes, threshold, epoch, img_name, output_path, mode):
     """
        Detections and ground_truth numpy array (n_objects, 256, 256)
        Image torch tensor (256,256,3)
@@ -143,6 +143,42 @@ def plot_detections_vs_groundtruth(detections, ground_truth, image, bounding_box
     # else:
     plt.show()
 
+
+def plot_semantic_segmentation(pred_mask, gt_mask, input_tensor):
+    """Plot input image, ground truth mask, predicted mask, and overlay (pred=white, gt=green)."""
+    input_np = input_tensor.detach().cpu().permute(1, 2, 0).numpy()
+    pred_np = pred_mask.squeeze().detach().cpu().numpy()
+    gt_np = gt_mask.squeeze().detach().cpu().numpy()
+
+    # Create overlay RGB image: black background
+    overlay = np.zeros((*gt_np.shape, 3), dtype=np.float32)
+    overlay[pred_np == 1] = [1.0, 1.0, 1.0]  # white for prediction
+    overlay[gt_np == 1] = [1.0, 0.0, 0.0]    # red for ground truth
+    overlay[np.logical_and(pred_np == 1, gt_np == 1)] = [0.0, 1.0, 0.0]  # yellow if both overlap
+
+    fig, axs = plt.subplots(1, 4, figsize=(16, 4))
+
+    axs[0].imshow(input_np, cmap='gray')
+    axs[0].set_title("Input Image")
+    axs[0].axis('off')
+
+    axs[1].imshow(gt_np, cmap='gray')
+    axs[1].set_title("Ground Truth Mask")
+    axs[1].axis('off')
+
+    axs[2].imshow(pred_np, cmap='gray')
+    axs[2].set_title("Predicted Mask")
+    axs[2].axis('off')
+
+    axs[3].imshow(overlay)
+    axs[3].set_title("Overlay (White=Pred, Red=GT, Green=Both)")
+    axs[3].axis('off')
+
+    plt.tight_layout()
+    plt.show()
+
+
+
 def visualize_single_cells(input_tensor, gt_masks, preds):
     if torch.is_tensor(input_tensor):
         input_tensor = input_tensor.cpu().numpy()
@@ -157,9 +193,6 @@ def visualize_single_cells(input_tensor, gt_masks, preds):
 
         gt_mask = gt_masks[i]
         pred = preds[i]
-
-        # Apply threshold to the predictions (only values > 0.5 will be shown)
-        pred_thresholded = (pred > 0.5).astype(np.float32)
 
         fig, axs = plt.subplots(1, 5, figsize=(12, 4))
 
@@ -179,11 +212,6 @@ def visualize_single_cells(input_tensor, gt_masks, preds):
         axs[3].imshow(pred, cmap='Greens')
         axs[3].set_title("Pred")
         axs[3].axis('off')
-
-        # Displaying the thresholded prediction
-        axs[4].imshow(pred_thresholded, cmap='Greens')
-        axs[4].set_title("Pred > 0.5")
-        axs[4].axis('off')
 
         plt.tight_layout()
         plt.show()

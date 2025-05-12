@@ -3,7 +3,7 @@ from transformers import SamProcessor, SamModel, AutoModel, AutoProcessor
 import os
 import numpy as np
 from codebase.utils.metrics import calculate_metrics,  average_precision
-from codebase.utils.visualize import plot_ap,plot_detections_vs_groundtruth,plot_loss, calculate_bbox_accuracy
+from codebase.utils.visualize import plot_ap,plot_instance_segmentation,plot_loss, calculate_bbox_accuracy
 from codebase.utils.test_utils import get_yolo_bboxes, nms, pad_predictions
 import torch.nn as nn
 import monai
@@ -82,7 +82,7 @@ def train_sam(DEVICE, train_data, num_epochs, threshold, backbone, output_path):
 
                 # Optional visualization on last epoch
                 if epoch % 5 == 0 or epoch == num_epochs - 1:
-                    plot_detections_vs_groundtruth(
+                    plot_instance_segmentation(
                         detections=pred_masks.detach().cpu().numpy(),
                         ground_truth=valid_gt_masks.cpu().numpy(),
                         image=batch["image"][item_index],

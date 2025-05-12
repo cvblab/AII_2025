@@ -13,7 +13,7 @@ import os
 import numpy as np
 from codebase.utils.metrics import calculate_metrics,  average_precision
 from codebase.utils.test_utils import pad_predictions
-from codebase.utils.visualize import plot_ap,plot_detections_vs_groundtruth,plot_loss, visualize_single_cells, calculate_bbox_accuracy
+from codebase.utils.visualize import plot_ap,plot_instance_segmentation,plot_loss, visualize_single_cells, calculate_bbox_accuracy
 import torch.nn as nn
 from codebase.utils.test_utils import get_yolo_bboxes, nms, pad_predictions
 from torchvision.transforms.functional import rgb_to_grayscale
@@ -37,13 +37,19 @@ def create_bbox_mask(image_shape, bbox):
 
 
 def get_unet(DEVICE):
-
-    model = smp.Unet(
+    model = smp.Segformer(
         encoder_name="resnet34",  # choose encoder, e.g. mobilenet_v2 or efficientnet-b7
         encoder_weights="imagenet",  # use `imagenet` pre-trained weights for encoder initialization
         in_channels=2,  # model input channels (1 for gray-scale images, 3 for RGB, etc.)
         classes=1,  # model output channels (number of classes in your dataset)
     )
+
+    # model = smp.Unet(
+    #     encoder_name="resnet34",  # choose encoder, e.g. mobilenet_v2 or efficientnet-b7
+    #     encoder_weights="imagenet",  # use `imagenet` pre-trained weights for encoder initialization
+    #     in_channels=2,  # model input channels (1 for gray-scale images, 3 for RGB, etc.)
+    #     classes=1,  # model output channels (number of classes in your dataset)
+    # )
     model.to(DEVICE)
     bce_loss_fn = nn.BCEWithLogitsLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
@@ -51,7 +57,7 @@ def get_unet(DEVICE):
     return model, optimizer, bce_loss_fn
 
 
-def train_unett(DEVICE, train_data, num_epochs, threshold, output_path):
+def train_unet(DEVICE, train_data, num_epochs, threshold, output_path):
 
     model, optimizer, bce_loss_fn = get_unet(DEVICE)
     print("Training U-NET")
@@ -146,7 +152,7 @@ def train_unett(DEVICE, train_data, num_epochs, threshold, output_path):
                 total_FP += FP
                 total_FN += FN
 
-                plot_detections_vs_groundtruth(
+                plot_instance_segmentation(
                     detections=pred_masks.detach().cpu().numpy().squeeze(),
                     ground_truth=valid_gt_masks.cpu().numpy().squeeze(),
                     image=batch["image"][item_index],
