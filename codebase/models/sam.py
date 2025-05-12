@@ -1,17 +1,9 @@
 import torch
-from skimage.filters.rank import threshold
-from torch.utils.data import DataLoader
 from transformers import SamProcessor, SamModel, AutoModel, AutoProcessor
-from codebase.data.dataset import SegDataset, create_dataset, custom_collate_fn
-from codebase.data.preprocess import augment_dataset_with_original, augmenter
-from segment_anything import sam_model_registry, SamPredictor
 import os
-import matplotlib.pyplot as plt
 import numpy as np
-import matplotlib.patches as patches
 from codebase.utils.metrics import calculate_metrics,  average_precision
 from codebase.utils.visualize import plot_ap,plot_detections_vs_groundtruth,plot_loss, calculate_bbox_accuracy
-from predict_instance_segmentation import stardist_centroids
 from codebase.utils.test_utils import get_yolo_bboxes, nms, pad_predictions
 import torch.nn as nn
 import monai
@@ -42,7 +34,7 @@ def predict_masks(DEVICE, model, model_processor, image, bboxes, test=False):
 
 def train_sam(DEVICE, train_data, num_epochs, threshold, backbone, output_path):
     model,model_processor, optimizer, bce_loss_fn, seg_loss = get_sam_model(DEVICE, backbone)
-    print("Training SAM")
+    print(f"Training SAM on {DEVICE}")
     last_model_path = f'{output_path}/weights/last.pth'
     best_model_path = f'{output_path}/weights/best.pth'
     os.makedirs(output_path, exist_ok=True)

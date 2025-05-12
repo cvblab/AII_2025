@@ -24,14 +24,14 @@ if __name__ == "__main__":
     print(torch.version.cuda)
     print("torch version:", torch.__version__)
 
-    data = "fluo"  # fluo  dsb  mixed  breast
+    data = "subtilis"  # fluo  dsb  mixed  breast
     if data == "dsb":
         images_path = "../datasets/dsb2018/test/images/*.tif"
         masks_path = "../datasets/dsb2018/test/masks/*.tif"
 
-    elif data == "fluo":
-        images_path = "../datasets/fluorescence_dataset/test/fluorescence/*.tif"
-        masks_path = "../datasets/fluorescence_dataset/test/masks/*.tif"
+    elif data == "aureus":
+        images_path = "../datasets/aureus/test/fluorescence/*.tif"
+        masks_path = "../datasets/aureus/test/masks/*.tif"
 
     elif data == "mixed":
         images_path = "../datasets/mixed_dataset/test/source/*.tif"
@@ -40,6 +40,10 @@ if __name__ == "__main__":
     elif data == "breast":
         images_path = "../datasets/breast_cancer/test/images/*.tif"
         masks_path = "../datasets/breast_cancer/test/masks/*.tif"
+
+    elif data == "subtilis":
+        images_path = "../datasets/subtilis/test/fluorescence/*.png"
+        masks_path = "../datasets/subtilis/test/masks/*.png"
 
     dataset = create_dataset(images_path, masks_path, preprocess=True, axis_norm=(0, 1))
     print("Acquiring images from " + data + " dataset.")

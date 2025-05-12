@@ -9,6 +9,7 @@ import torch
 from .preprocess import get_bounding_boxes, preprocess_data
 import cv2
 import os
+import imageio.v2 as imageio  # imageio.v2 avoids deprecation warnings
 from csbdeep.utils import normalize
 #from Stardist.stardist import fill_label_holes
 from codebase.Stardist.stardist import fill_label_holes
@@ -34,14 +35,28 @@ def create_dataset(images_path, masks_path, preprocess=True, axis_norm=(0, 1)):
 
     return dataset
 
+
+def read_image(path):
+    ext = os.path.splitext(path)[1].lower()
+    if ext in ['.tif', '.tiff']:
+        img = tifffile.imread(path)
+    elif ext in ['.png', '.jpg', '.jpeg']:
+        img = imageio.imread(path)
+    else:
+        raise ValueError(f"Unsupported file format: {ext}")
+
+    # Convert RGB to grayscale if needed
+    if img.ndim == 3 and img.shape[2] == 3:
+        img = np.dot(img[..., :3], [0.2989, 0.5870, 0.1140])
+
+    return img.astype(np.float32)
+
 def load_data(images_path, masks_path):
-    # Use glob to get sorted lists of image and mask file paths
     image_files = sorted(glob.glob(images_path))
     mask_files = sorted(glob.glob(masks_path))
 
-    # Read the images and masks using tifffile
-    images = [tifffile.imread(img) for img in image_files]  # Store images in a list
-    masks = [tifffile.imread(mask) for mask in mask_files]  # Store masks in a list
+    images = [read_image(img) for img in image_files]
+    masks = [read_image(mask).astype(np.int32) for mask in mask_files]
 
     return images, masks, image_files
 

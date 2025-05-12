@@ -1,5 +1,4 @@
 import torch
-from skimage.filters.rank import threshold
 from torch.utils.data import DataLoader
 from transformers import SamProcessor, SamModel, AutoModel, AutoProcessor
 from codebase.data.dataset import create_dataset, SegDataset, custom_collate_fn
@@ -7,39 +6,31 @@ from models.sam import train_sam
 from models.unet import train_unet
 from models.unettorch import train_unett
 from models.stardist import train_stardist
-from segment_anything import sam_model_registry, SamPredictor
-import os
-import matplotlib.pyplot as plt
-import numpy as np
-import matplotlib.patches as patches
-from codebase.utils.metrics import calculate_metrics, average_precision
-from codebase.utils.visualize import plot_detections_vs_groundtruth, plot_loss, \
-    plot_ap
-from predict_instance_segmentation import stardist_centroids
-import torch.nn as nn
-import monai
-import sys
 
 if __name__ == "__main__":
     print(torch.version.cuda)
     print("torch version:", torch.__version__)
 
-    data = "dsb" # fluo  dsb  mixed  breast
+    data = "aureus" # fluo  dsb  mixed  breast
     if data == "dsb":
         images_path = "../datasets/dsb2018/train/images/*.tif"
         masks_path = "../datasets/dsb2018/train/masks/*.tif"
 
-    elif data == "fluo":
-        images_path = "../datasets/fluorescence_dataset/train/patches/fluorescence/*.tif"
-        masks_path = "../datasets/fluorescence_dataset/train/patches/masks/*.tif"
+    elif data == "aureus":
+        images_path = "../datasets/aureus/train/patches/fluorescence/*.tif"
+        masks_path = "../datasets/aureus/train/patches/masks/*.tif"
 
     elif data == "mixed":
         images_path = "../datasets/mixed_dataset/training/source/*.tif"
         masks_path = "../datasets/mixed_dataset/training/target/*.tif"
 
     elif data == "breast":
-        images_path = "../../datasets/breast_cancer/train/images/*.tif"
-        masks_path = "../../datasets/breast_cancer/train/masks/*.tif"
+        images_path = "../datasets/breast_cancer/train/images/*.tif"
+        masks_path = "../datasets/breast_cancer/train /masks/*.tif"
+
+    elif data == "subtilis":
+        images_path = "../datasets/subtilis/train/fluorescence/*.png"
+        masks_path = "../datasets/subtilis/train/masks/*.png"
 
     dataset = create_dataset(images_path, masks_path, preprocess=True, axis_norm=(0, 1))
     print("Acquiring images from "+ data + " dataset.")
@@ -54,7 +45,7 @@ if __name__ == "__main__":
     train_data = DataLoader(train_dataset, batch_size=2, shuffle=True, collate_fn=custom_collate_fn)
 
     model_type = "sam"  # or "unet", "stardist" "sam"
-    num_epochs = 5
+    num_epochs = 20
     threshold = 0.7
     output_path = "../logs/training/" + data + "/" + model_type
 
