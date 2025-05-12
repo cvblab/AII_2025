@@ -1,16 +1,13 @@
 import torch
-from torch.utils.data import DataLoader
-from transformers import SamProcessor, SamModel, AutoModel, AutoProcessor
-from codebase.data.dataset import create_dataset, SegDataset, custom_collate_fn, get_dataset_path
 from codebase.utils.visualize import plot_semantic_segmentation
 from codebase.utils.metrics import metrics_semantic_segmentation
 import segmentation_models_pytorch as smp
-import numpy as np
 import torch.nn as nn
 import torch.optim as optim
 from tqdm import tqdm
 import os
-import matplotlib.pyplot as plt
+import pandas as pd
+
 
 def train_semantic_seg(DEVICE, train_data, num_epochs, output_path):
     model = smp.Unet(
@@ -69,3 +66,64 @@ def train_semantic_seg(DEVICE, train_data, num_epochs, output_path):
         print(f"Loss: {total_loss:.4f} | Precision: {precision:.4f} | Recall: {recall:.4f} | F1: {f1:.4f}")
 
     torch.save(model.state_dict(), os.path.join(output_path, f"unet_epoch{epoch + 1}.pth"))
+
+
+def test_semantic_segmentation(DEVICE, test_data, model_path):
+    model = smp.Unet(
+        encoder_name="resnet34",
+        encoder_weights=None,
+        in_channels=3,
+        classes=1
+    ).to(DEVICE)
+
+    model.load_state_dict(torch.load(model_path, map_location=DEVICE))
+    model.eval()
+
+    total_TP, total_FP, total_FN = 0, 0, 0
+    results = []
+
+    for index, test_sample in enumerate(test_data):
+        input_tensor = test_sample['image'].float().permute(2, 0, 1).to(DEVICE)
+        original_gt_masks = test_sample['original_gt_masks'].float().to(DEVICE)
+        gt_mask = (original_gt_masks > 0).float().unsqueeze(0)
+
+        with torch.no_grad():
+            input_tensor_batch = input_tensor.unsqueeze(0)
+            pred = model(input_tensor_batch)
+            pred_mask_bin = (torch.sigmoid(pred) > 0.5).float().squeeze().cpu()
+
+        TP, FP, FN = metrics_semantic_segmentation(pred_mask_bin, gt_mask.cpu())
+
+        precision = TP / (TP + FP + 1e-8)
+        recall = TP / (TP + FN + 1e-8)
+        f1 = 2 * precision * recall / (precision + recall + 1e-8)
+
+        results.append({
+            "sample_index": index,
+            "TP": TP,
+            "FP": FP,
+            "FN": FN,
+            "Precision": precision,
+            "Recall": recall,
+            "F1": f1
+        })
+
+        total_TP += TP
+        total_FP += FP
+        total_FN += FN
+
+        plot_semantic_segmentation(pred_mask_bin, gt_mask, input_tensor)
+
+    # Global metrics
+    global_precision = total_TP / (total_TP + total_FP + 1e-8)
+    global_recall = total_TP / (total_TP + total_FN + 1e-8)
+    global_f1 = 2 * global_precision * global_recall / (global_precision + global_recall + 1e-8)
+
+    print(f"\nGlobal Precision: {global_precision:.4f} | Recall: {global_recall:.4f} | F1: {global_f1:.4f}")
+
+    # Convert to DataFrame
+    df_results = pd.DataFrame(results)
+    print("\nPer-sample metrics:")
+    print(df_results)
+
+    return df_results

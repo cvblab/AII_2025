@@ -37,5 +37,5 @@ if __name__ == "__main__":
         train_unet(DEVICE, train_data, num_epochs, threshold, output_path=output_path)
     elif model_type == "stardist":
         train_stardist(DEVICE, train_data, num_epochs, threshold, output_path=output_path)
-    elif model_type == "stardist":
+    elif model_type == "semantic":
         train_semantic_seg(DEVICE, train_data, num_epochs, output_path=output_path)

@@ -14,6 +14,16 @@ def calculate_iou(pred_mask, gt_mask):
         return 0.0  # Avoid division by zero
     return intersection / union
 
+def metrics_semantic_segmentation(pred_mask_bin, gt_mask):
+    # Compute TP, FP, FN
+    pred_mask_bin = pred_mask_bin.squeeze().bool()
+    gt_mask_bin = gt_mask.squeeze().bool()
+
+    TP = torch.logical_and(pred_mask_bin, gt_mask_bin).sum().item()
+    FP = torch.logical_and(pred_mask_bin, ~gt_mask_bin).sum().item()
+    FN = torch.logical_and(~pred_mask_bin, gt_mask_bin).sum().item()
+
+    return TP, FP, FN
 
 def calculate_metrics(detections, ground_truth, threshold):
     """

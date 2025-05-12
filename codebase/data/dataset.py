@@ -16,6 +16,31 @@ from codebase.Stardist.stardist import fill_label_holes
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
+def get_dataset_path(data, mode):
+
+    if data == "dsb":
+        images_path = f"../datasets/dsb2018/{mode}/images/*.tif"
+        masks_path = f"../datasets/dsb2018/{mode}/masks/*.tif"
+
+    elif data == "aureus":
+        images_path = f"../datasets/aureus/{mode}/patches/fluorescence/*.tif"
+        masks_path = f"../datasets/aureus/{mode}/patches/masks/*.tif"
+
+    elif data == "mixed":
+        images_path = f"../datasets/mixed_dataset/{mode}/source/*.tif"
+        masks_path = f"../datasets/mixed_dataset/{mode}/target/*.tif"
+
+    elif data == "breast":
+        images_path = f"../datasets/breast_cancer/{mode}/images/*.tif"
+        masks_path = f"../datasets/breast_cancer/{mode}/masks/*.tif"
+
+    elif data == "subtilis":
+        images_path = f"../datasets/subtilis/{mode}/fluorescence/*.png"
+        masks_path = f"../datasets/subtilis/{mode}/masks/*.png"
+
+    return images_path, masks_path
+
+
 def create_dataset(images_path, masks_path, preprocess=True, axis_norm=(0, 1)):
     images, masks, paths = load_data(images_path, masks_path)
 

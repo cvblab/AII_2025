@@ -1,50 +1,21 @@
-import sys
-import os
 import torch
-from csbdeep.utils import Path, normalize
-from monai.data import ultrasound_confidence_map
-from skimage.filters.rank import threshold
-from torch.backends.mkl import verbose
 from torch.utils.data import DataLoader
-from transformers import SamProcessor, SamModel, AutoModel, AutoProcessor
-from codebase.data.dataset import SegDataset, create_dataset, custom_collate_fn
-from segment_anything import sam_model_registry, SamPredictor
-import os
-import matplotlib.pyplot as plt
+from transformers import SamProcessor
+from codebase.data.dataset import SegDataset, create_dataset, custom_collate_fn, get_dataset_path
 import numpy as np
-import matplotlib.patches as patches
-from codebase.utils.metrics import calculate_metrics, average_precision
-from codebase.utils.visualize import plot_detections_vs_groundtruth, plot_nms, calculate_bbox_accuracy, plot_bboxes
 from codebase.models.sam import test_sam
 from codebase.models.stardist import test_stardist
 from codebase.models.unettorch import test_unet
+from codebase.models.unet_semantic_segmentation import test_semantic_segmentation
 
 
 if __name__ == "__main__":
     print(torch.version.cuda)
     print("torch version:", torch.__version__)
 
-    data = "subtilis"  # fluo  dsb  mixed  breast
-    if data == "dsb":
-        images_path = "../datasets/dsb2018/test/images/*.tif"
-        masks_path = "../datasets/dsb2018/test/masks/*.tif"
-
-    elif data == "aureus":
-        images_path = "../datasets/aureus/test/fluorescence/*.tif"
-        masks_path = "../datasets/aureus/test/masks/*.tif"
-
-    elif data == "mixed":
-        images_path = "../datasets/mixed_dataset/test/source/*.tif"
-        masks_path = "../datasets/mixed_dataset/test/target/*.tif"
-
-    elif data == "breast":
-        images_path = "../datasets/breast_cancer/test/images/*.tif"
-        masks_path = "../datasets/breast_cancer/test/masks/*.tif"
-
-    elif data == "subtilis":
-        images_path = "../datasets/subtilis/test/fluorescence/*.png"
-        masks_path = "../datasets/subtilis/test/masks/*.png"
-
+    data = "aureus"  # fluo  dsb  mixed  breast
+    mode = "test"
+    images_path, masks_path = get_dataset_path(data, mode)
     dataset = create_dataset(images_path, masks_path, preprocess=True, axis_norm=(0, 1))
     print("Acquiring images from " + data + " dataset.")
 
@@ -68,3 +39,5 @@ if __name__ == "__main__":
         test_unet(DEVICE, test_data, model_path, tp_thresholds, nms_iou_threshold)
     elif model_type == "stardist":
         test_stardist(DEVICE, test_data,tp_thresholds)
+    elif model_type == "semantic_segmentation":
+        test_semantic_segmentation(DEVICE, test_data, model_path)
