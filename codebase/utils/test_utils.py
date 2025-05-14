@@ -1,5 +1,6 @@
 import torch
 from ultralytics import YOLO
+import numpy as np
 
 def nms(boxes, scores, iou_threshold=0.5):
 
@@ -40,7 +41,12 @@ def nms(boxes, scores, iou_threshold=0.5):
 
 def get_yolo_bboxes(image, weights_path="../weights/yolo/yolov8n_dsb18.pt"):
     model = YOLO(weights_path)
-    image_resized = torch.tensor(image).permute(0,3,1,2)
+    if image.ndim == 2:
+        image_resized = image.unsqueeze(0).repeat(1, 3, 1, 1)
+
+    else:
+        image_resized = torch.tensor(image).permute(0, 3, 1, 2)
+
     # Perform prediction on the image
     results = model.predict(source=image_resized, save=False, save_txt=False,verbose=False)
     boxes = results[0].boxes.xyxy

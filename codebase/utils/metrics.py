@@ -23,7 +23,11 @@ def metrics_semantic_segmentation(pred_mask_bin, gt_mask):
     FP = torch.logical_and(pred_mask_bin, ~gt_mask_bin).sum().item()
     FN = torch.logical_and(~pred_mask_bin, gt_mask_bin).sum().item()
 
-    return TP, FP, FN
+    precision = TP / (TP + FP + 1e-8)
+    recall = TP / (TP + FN + 1e-8)
+    f1 = 2 * precision * recall / (precision + recall + 1e-8)
+
+    return TP, FP, FN, precision, recall, f1
 
 def calculate_metrics(detections, ground_truth, threshold):
     """

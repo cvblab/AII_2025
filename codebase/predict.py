@@ -13,7 +13,7 @@ if __name__ == "__main__":
     print(torch.version.cuda)
     print("torch version:", torch.__version__)
 
-    data = "aureus"  # fluo  dsb  mixed  breast
+    data = "dsb"  # fluo  dsb  mixed  breast
     mode = "test"
     images_path, masks_path = get_dataset_path(data, mode)
     dataset = create_dataset(images_path, masks_path, preprocess=True, axis_norm=(0, 1))
@@ -27,17 +27,19 @@ if __name__ == "__main__":
     test_dataset = SegDataset(dataset=dataset, processor=processor)
     test_data = DataLoader(test_dataset, batch_size=1, shuffle=True, collate_fn=custom_collate_fn)
 
-    model_type = "stardist"  # or "unet", "stardist" "sam"
+    model_type = "sam"  # or "unet", "stardist" "sam"
+    semantic = True
     threshold = 0.7
     nms_iou_threshold = 0.5
     tp_thresholds = [round(th, 2) for th in np.arange(0.5, 1.0, 0.05)]
-    model_path = "../weights/sam/sam_model_dsb_best.pth"
-
+    instance_seg_model_path = "../weights/sam/sam_model_dsb_best.pth"
+    semantic_seg_model_path = "../logs/training/semantic/dsb/unet_final_epoch50.pth"
+    yolo_path = "yolov8/runs/yolov8_dsb_masks/weights/best.pt"
     if model_type == "sam":
-        test_sam(DEVICE, test_data, model_path, tp_thresholds, nms_iou_threshold, backbone="base")
+        test_sam(DEVICE, test_data, instance_seg_model_path, semantic_seg_model_path, yolo_path, tp_thresholds, nms_iou_threshold, backbone="base", semantic=semantic)
     elif model_type == "unet":
-        test_unet(DEVICE, test_data, model_path, tp_thresholds, nms_iou_threshold)
+        test_unet(DEVICE, test_data, instance_seg_model_path, tp_thresholds, nms_iou_threshold)
     elif model_type == "stardist":
         test_stardist(DEVICE, test_data,tp_thresholds)
     elif model_type == "semantic_segmentation":
-        test_semantic_segmentation(DEVICE, test_data, model_path)
+        test_semantic_segmentation(DEVICE, test_data, semantic_seg_model_path)

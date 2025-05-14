@@ -220,7 +220,7 @@ def visualize_single_cells(input_tensor, gt_masks, preds):
 def plot_loss(epoch_losses_list,num_epochs,output_path):
     # Plot the metrics after training
     plt.figure(figsize=(12, 6))
-    plt.plot(range(0, num_epochs + 1), epoch_losses_list, marker='o', label='Loss')
+    plt.plot(range(1, num_epochs + 1), epoch_losses_list, marker='o', label='Loss')
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
     plt.title('Epoch Loss')
@@ -354,3 +354,4 @@ def plot_bboxes(image, gt_bboxes, pred_bboxes, tp_indices, fp_indices):
 
     plt.tight_layout()
     plt.show()
+

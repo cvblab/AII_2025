@@ -24,10 +24,10 @@ if __name__ == "__main__":
     # Initialize SAMDataset and DataLoader
     processor = SamProcessor.from_pretrained("facebook/sam-vit-base")
     train_dataset = SegDataset(dataset=dataset, processor=processor)
-    train_data = DataLoader(train_dataset, batch_size=2, shuffle=True, collate_fn=custom_collate_fn)
+    train_data = DataLoader(train_dataset, batch_size=16, shuffle=True, collate_fn=custom_collate_fn)
 
     model_type = "semantic"  # or "unet", "stardist" "sam"
-    num_epochs = 20
+    num_epochs = 50
     threshold = 0.7
     output_path = "../logs/training/" + model_type + "/" + data
 
