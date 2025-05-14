@@ -1,45 +1,62 @@
 import os
 import numpy as np
 from PIL import Image
-import matplotlib.pyplot as plt
-from codebase.data.dataset import get_dataset_path
 import glob
+import matplotlib.pyplot as plt
+from codebase.data.dataset import get_dataset_path,load_data
+import torch
+from torch.utils.data import DataLoader
+from transformers import SamProcessor, SamModel, AutoModel, AutoProcessor
+from codebase.data.dataset import create_dataset, SegDataset, custom_collate_fn, get_dataset_path
 
-def convert_instance_masks_to_binary(input_dir, output_dir, visualize=True):
+def convert_instance_masks_to_binary(images_dir,masks_dir, output_dir, visualize=True):
     os.makedirs(output_dir, exist_ok=True)
-    file_list = glob.glob(input_dir)
-    for path in file_list:
+    dataset = create_dataset(images_dir, masks_dir, preprocess=True, axis_norm=(0, 1))
+    # Initialize SAMDataset and DataLoader
+    processor = SamProcessor.from_pretrained("facebook/sam-vit-base")
+    test_dataset = SegDataset(dataset=dataset, processor=processor)
+    train_data = DataLoader(test_dataset, batch_size=1, shuffle=True, collate_fn=custom_collate_fn)
 
-        filename = os.path.basename(path)
-        mask = np.array(Image.open(path))
+    for index, train_sample in enumerate(train_data):
+        if train_sample is None or len(train_sample["image"]) == 0:
+            print(f"Skipping empty batch {index}.")
+            continue
 
-        # Convert to binary: 0 for background, 1 for any object
-        binary_mask = (mask > 0).astype(np.uint8) * 255  # Scale to 255 for saving/viewing
+        image = train_sample["image"].squeeze(0)
+        mask = train_sample['original_gt_masks'].squeeze(0).float()
+        name = os.path.basename(str(train_sample['path'][0]))
+
+        # Correct binary mask conversion
+        binary_mask = ((mask > 0).byte().cpu().numpy()) * 255
 
         # Save binary mask
-        out_path = os.path.join(output_dir, filename)
+        out_path = os.path.join(output_dir, name)
         Image.fromarray(binary_mask).save(out_path)
 
         # Visualization
         if visualize:
-            fig, axs = plt.subplots(1, 2, figsize=(8, 4))
-            axs[0].imshow(mask, cmap='nipy_spectral')
-            axs[0].set_title("Original Instance Mask")
+            fig, axs = plt.subplots(1, 3, figsize=(12, 4))
+            axs[0].imshow(image)
+            axs[0].set_title("Original Image")
             axs[0].axis('off')
 
-            axs[1].imshow(binary_mask, cmap='gray')
-            axs[1].set_title("Binary Mask")
+            axs[1].imshow(mask, cmap='nipy_spectral')
+            axs[1].set_title("Instance Mask")
             axs[1].axis('off')
 
-            plt.suptitle(filename)
+            axs[2].imshow(binary_mask, cmap='gray')
+            axs[2].set_title("Binary Mask")
+            axs[2].axis('off')
+
+            plt.suptitle(name)
             plt.tight_layout()
             plt.show()
 
     print(f"Binary masks saved to: {output_dir}")
 
 if __name__ == "__main__":
-    data = "breast"  # aureus  dsb  mixed  breast subtilis
+    data = "subtilis"  # aureus  dsb  mixed  breast subtilis
     mode = "train"
     images_path, masks_path = get_dataset_path(data, mode)
-    output_dir = f"../yolov8/data/train_{data}/masks"
-    convert_instance_masks_to_binary(f"../{masks_path}", output_dir, visualize=True)
+    output_dir = f"../yolov8/data/train_{data}/masks/images"
+    convert_instance_masks_to_binary(f"../{images_path}", f"../{masks_path}", output_dir, visualize=True)

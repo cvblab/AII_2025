@@ -7,7 +7,7 @@ import torch
 from skimage.filters.rank import threshold
 from torch.utils.data import DataLoader
 from transformers import SamProcessor, SamModel, AutoModel, AutoProcessor
-from codebase.data.dataset import SegDataset, create_dataset, custom_collate_fn
+from codebase.data.dataset import SegDataset, create_dataset, custom_collate_fn, get_dataset_path
 import os
 import matplotlib.patches as patches
 
@@ -112,12 +112,13 @@ def save_labels(labels_output_path, images_output_path, image_file, image, bound
 
 if __name__ == "__main__":
 
-    images_path = "../../datasets/breast_cancer/train/images/*.tif"  # Path to your images
-    masks_path = "../../datasets/breast_cancer/train/masks/*.tif"
-    labels_output_path = "data/train_breast/labels"  # Path to save the txt files (create this directory)
-    images_output_path = "data/train_breast/images"
+    data = "subtilis"  # aureus  dsb  mixed  breast subtilis
+    mode = "train"
+    images_path, masks_path = get_dataset_path(data, mode)
+    labels_output_path = f"data/train_{data}/labels"  # Path to save the txt files (create this directory)
+    images_output_path = f"data/train_{data}/images"
 
-    dataset = create_dataset(images_path, masks_path)
+    dataset = create_dataset(f"../{images_path}", f"../{masks_path}")
     processor = SamProcessor.from_pretrained("facebook/sam-vit-base")
     train_dataset = SegDataset(dataset=dataset, processor=processor)
     train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=True, collate_fn=custom_collate_fn)

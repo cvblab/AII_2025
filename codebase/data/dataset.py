@@ -23,8 +23,8 @@ def get_dataset_path(data, mode):
         masks_path = f"../datasets/dsb2018/{mode}/masks/*.tif"
 
     elif data == "aureus":
-        images_path = f"../datasets/aureus/{mode}/patches/fluorescence/*.tif"
-        masks_path = f"../datasets/aureus/{mode}/patches/masks/*.tif"
+        images_path = f"../datasets/aureus/{mode}/fluorescence/*.tif"
+        masks_path = f"../datasets/aureus/{mode}/masks/*.tif"
 
     elif data == "mixed":
         images_path = f"../datasets/mixed_dataset/{mode}/source/*.tif"

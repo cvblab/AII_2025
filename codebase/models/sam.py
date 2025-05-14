@@ -151,7 +151,7 @@ def test_sam(DEVICE, test_data, model_path, tp_thresholds, nms_iou_threshold, ba
             all_aps_per_threshold[threshold].append(AP)  # Store AP for this threshold
             print(f"Sample {index}, IoU Threshold: {threshold}, AP: {AP}, TP: {TP}, FP: {FP}, FN: {FN}")
 
-        plot_detections_vs_groundtruth(
+        plot_instance_segmentation(
            detections=pred_masks.detach().cpu().numpy(),
            ground_truth=gt_masks.cpu().numpy(),
            image=test_sample["image"].squeeze(0),

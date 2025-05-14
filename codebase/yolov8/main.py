@@ -2,10 +2,11 @@ from codebase.yolov8.yolo_utils import get_detection_metrics, predict_and_visual
 
 
 if __name__ == '__main__':
-    train_model(name="yolov8_breast")  # to yolov8x_dsb18 yolov8
-    data = "mixed"  # fluo  dsb  mixed  breast
+    #train_model(name="yolov8_dsb_masks")  # to yolov8x_dsb18 yolov8
+    data = "aureus"  # aureus  dsb  mixed  breast subtilis
+    mode = "train"
     weights_path = "../../weights/yolo/yolov8n_dsb18.pt"
-    get_detection_metrics(data, weights_path)
+    get_detection_metrics(data, mode, weights_path)
 
     # weights_path = "../../weights/yolo/yolov8n_dsb18.pt"  # yolov8n_dsb18 yolov8n_fluo yolov8x_dsb18 yolov8x_fluo
     # images_path = "../../datasets/fluorescence_dataset/test/fluorescence"
