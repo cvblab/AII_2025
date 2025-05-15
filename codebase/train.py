@@ -26,14 +26,14 @@ if __name__ == "__main__":
     train_dataset = SegDataset(dataset=dataset, processor=processor)
     train_data = DataLoader(train_dataset, batch_size=16, shuffle=True, collate_fn=custom_collate_fn)
 
-    model_type = "semantic"  # or "unet", "stardist" "sam"
+    model_type = "unet"  # or "unet", "stardist" "sam"
     num_epochs = 50
     threshold = 0.7
     output_path = "../logs/training/" + model_type + "/" + data
 
     if model_type == "sam": # base large huge
         train_sam(DEVICE, train_data, num_epochs, threshold, backbone="base", output_path=output_path)
-    elif model_type == "unett":
+    elif model_type == "unet":
         train_unet(DEVICE, train_data, num_epochs, threshold, output_path=output_path)
     elif model_type == "stardist":
         train_stardist(DEVICE, train_data, num_epochs, threshold, output_path=output_path)

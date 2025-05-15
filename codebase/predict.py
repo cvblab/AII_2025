@@ -35,10 +35,11 @@ if __name__ == "__main__":
     instance_seg_model_path = "../weights/sam/sam_model_dsb_best.pth"
     semantic_seg_model_path = "../logs/training/semantic/dsb/unet_final_epoch50.pth"
     yolo_path = "yolov8/runs/yolov8_dsb_masks/weights/best.pt"
+
     if model_type == "sam":
         test_sam(DEVICE, test_data, instance_seg_model_path, semantic_seg_model_path, yolo_path, tp_thresholds, nms_iou_threshold, backbone="base", semantic=semantic)
     elif model_type == "unet":
-        test_unet(DEVICE, test_data, instance_seg_model_path, tp_thresholds, nms_iou_threshold)
+        test_unet(DEVICE, test_data, instance_seg_model_path, semantic_seg_model_path, yolo_path, tp_thresholds, nms_iou_threshold, semantic=semantic)
     elif model_type == "stardist":
         test_stardist(DEVICE, test_data,tp_thresholds)
     elif model_type == "semantic_segmentation":

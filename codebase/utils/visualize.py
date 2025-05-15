@@ -194,7 +194,7 @@ def visualize_single_cells(input_tensor, gt_masks, preds):
         gt_mask = gt_masks[i]
         pred = preds[i]
 
-        fig, axs = plt.subplots(1, 5, figsize=(12, 4))
+        fig, axs = plt.subplots(1, 4, figsize=(12, 4))
 
         axs[0].imshow(image, cmap='gray')
         axs[0].set_title(f"Image {i + 1}")

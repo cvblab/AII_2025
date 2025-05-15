@@ -14,7 +14,7 @@ import pandas as pd
 import glob
 
 
-def get_detection_metrics(data, mode, weights_path, input_type="images"):
+def get_detection_metrics(data, mode, yolo_weights_path, semantic_seg_model_path, input_type="images"):
     images_path, masks_path = get_dataset_path(data, mode)
     dataset = create_dataset(f"../{images_path}", f"../{masks_path}", preprocess=True, axis_norm=(0, 1))
     print("Acquiring images from " + data + " dataset.")
@@ -33,17 +33,17 @@ def get_detection_metrics(data, mode, weights_path, input_type="images"):
 
         if input_type=="binary_masks":
             mask = test_sample['original_gt_masks'].squeeze(0).float()
-            binary_mask = ((mask > 0).byte().cpu().numpy()) * 255
-            yolo_boxes, confs = get_yolo_bboxes(binary_mask, weights_path)
+            binary_mask = (mask > 0).float() # float32 tensor with values 0 or 255
+            yolo_boxes, confs = get_yolo_bboxes(binary_mask, yolo_weights_path)
 
         elif input_type=="predicted_masks":
-            binary_prediction = predict_binary_mask(DEVICE, test_sample["image"], test_sample['original_gt_masks'].float(), semantic_seg_model_path)
-            yolo_boxes, confs = get_yolo_bboxes(binary_prediction)
+            binary_prediction, gt_binary_mask = predict_binary_mask(DEVICE, test_sample["image"].squeeze(0), test_sample['original_gt_masks'].float(), semantic_seg_model_path)
+            yolo_boxes, confs = get_yolo_bboxes(binary_prediction, yolo_weights_path)
 
         else:
-            gt_bboxes = test_sample["bounding_boxes"].squeeze(0)
-            yolo_boxes, confs = get_yolo_bboxes(test_sample["image"], weights_path)
+            yolo_boxes, confs = get_yolo_bboxes(test_sample["image"], yolo_weights_path)
 
+        gt_bboxes = test_sample["bounding_boxes"].squeeze(0)
         keep_indices = nms(yolo_boxes, confs, iou_threshold=nms_iou_threshold)
         yolo_boxes_nms = yolo_boxes[keep_indices.long()]
         TP, FP, FN, precision, recall, f1, tp_indices, fp_indices = calculate_bbox_accuracy(gt_bboxes, yolo_boxes_nms,

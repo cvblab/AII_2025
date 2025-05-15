@@ -130,7 +130,6 @@ def test_sam(DEVICE, test_data, sam_model_path, semantic_seg_model_path, yolo_pa
     model.load_state_dict(state_dict)
     model.to(DEVICE)
     model.eval()
-    all_APs = []
     all_aps_per_threshold = {threshold: [] for threshold in tp_thresholds}
 
     for index, test_sample in enumerate(test_data):
@@ -143,7 +142,7 @@ def test_sam(DEVICE, test_data, sam_model_path, semantic_seg_model_path, yolo_pa
             yolo_boxes, confs = get_yolo_bboxes(binary_prediction, yolo_path)
 
         else:
-            yolo_boxes, confs = get_yolo_bboxes(test_sample["image"])
+            yolo_boxes, confs = get_yolo_bboxes(test_sample["image"],yolo_path)
 
         keep_indices = nms(yolo_boxes, confs, iou_threshold=nms_iou_threshold)
         yolo_boxes_nms = yolo_boxes[keep_indices.long()]

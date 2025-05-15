@@ -13,7 +13,8 @@ import os
 import numpy as np
 from codebase.utils.metrics import calculate_metrics,  average_precision
 from codebase.utils.test_utils import pad_predictions
-from codebase.utils.visualize import plot_ap,plot_instance_segmentation,plot_loss, visualize_single_cells, calculate_bbox_accuracy
+from codebase.utils.visualize import plot_ap,plot_instance_segmentation,plot_loss, visualize_single_cells, calculate_bbox_accuracy,plot_semantic_segmentation
+from codebase.models.unet_semantic_segmentation import predict_binary_mask
 import torch.nn as nn
 from codebase.utils.test_utils import get_yolo_bboxes, nms, pad_predictions
 from torchvision.transforms.functional import rgb_to_grayscale
@@ -190,15 +191,14 @@ def train_unet(DEVICE, train_data, num_epochs, threshold, output_path):
         plot_loss(losses_list, epoch, output_path)
         plot_ap(average_precisions_list, epoch, output_path)
 
-def test_unet(DEVICE, test_data, model_path, tp_thresholds, nms_iou_threshold):
+def test_unet(DEVICE, test_data, unet_model_path, semantic_seg_model_path, yolo_path, tp_thresholds, nms_iou_threshold, semantic=False):
     model, model_processor, optimizer, bce_loss_fn, seg_loss = get_unet(DEVICE)
     print("Testing U-Net")
 
-    state_dict = torch.load(model_path, map_location="cuda" if torch.cuda.is_available() else "cpu")
+    state_dict = torch.load(unet_model_path, map_location="cuda" if torch.cuda.is_available() else "cpu")
     model.load_state_dict(state_dict)
     model.to(DEVICE)
     model.eval()
-    all_APs = []
     all_aps_per_threshold = {threshold: [] for threshold in tp_thresholds}
     sub_batch_size = 8
 
@@ -206,7 +206,14 @@ def test_unet(DEVICE, test_data, model_path, tp_thresholds, nms_iou_threshold):
         gt_bboxes = test_sample["bounding_boxes"].squeeze(0)
         gt_masks = test_sample['instance_gt_masks'].squeeze(0).float().to(DEVICE)
 
-        yolo_boxes, confs = get_yolo_bboxes(test_sample["image"])
+        if semantic==True:
+            binary_prediction, gt_binary_mask = predict_binary_mask(DEVICE, test_sample["image"].squeeze(0), test_sample['original_gt_masks'].float(), semantic_seg_model_path)
+            plot_semantic_segmentation(binary_prediction, gt_binary_mask, test_sample["image"].squeeze(0).permute(2, 0, 1).to(DEVICE))
+            yolo_boxes, confs = get_yolo_bboxes(binary_prediction, yolo_path)
+
+        else:
+            yolo_boxes, confs = get_yolo_bboxes(test_sample["image"],yolo_path)
+
         keep_indices = nms(yolo_boxes, confs, iou_threshold=nms_iou_threshold)
         yolo_boxes_nms = yolo_boxes[keep_indices.long()]
         print(f"Number of gt cells: {len(gt_bboxes)}")
@@ -245,7 +252,7 @@ def test_unet(DEVICE, test_data, model_path, tp_thresholds, nms_iou_threshold):
             all_aps_per_threshold[threshold].append(AP)  # Store AP for this threshold
             print(f"Sample {index}, IoU Threshold: {threshold}, AP: {AP}, TP: {TP}, FP: {FP}, FN: {FN}")
 
-        plot_detections_vs_groundtruth(
+        plot_instance_segmentation(
            detections=pred_masks.detach().cpu().numpy(),
            ground_truth=gt_masks.cpu().numpy(),
            image=test_sample["image"].squeeze(0),
