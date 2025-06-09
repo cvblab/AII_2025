@@ -6,13 +6,17 @@ import shutil
 import torch
 from PIL import Image
 import numpy as np
-
+from codebase.utils.visualize import plot_ap,plot_instance_segmentation
+from codebase.utils.test_utils import convert_masks_to_instances
+from codebase.utils.metrics import calculate_metrics,  average_precision
+import pandas as pd
 # Setup logging to see Cellpose output
 io.logger_setup()
 
 # Check GPU access
 if not core.use_gpu():
     raise RuntimeError("No GPU detected. Please make sure CUDA is available.")
+
 
 def prepare_cellpose_folder(data, target_dir, mask_suffix="_mask"):
     target_dir = Path(target_dir)
@@ -59,7 +63,7 @@ def prepare_cellpose_folder(data, target_dir, mask_suffix="_mask"):
 def train_cellpose(DEVICE, train_data, num_epochs, data,  model_name="cellpose_custom_model"):
     learning_rate = 1e-5
     weight_decay = 0.1
-    batch_size = 1
+    batch_size = 2
     model_name = f"cellpose/cellpose_{data}"
     train_dir = Path("tmp/cellpose_train")
     masks_ext = "_mask"
@@ -84,42 +88,52 @@ def train_cellpose(DEVICE, train_data, num_epochs, data,  model_name="cellpose_c
 
 
 # Evaluate on test data (optional)
-def test_cellpose(DEVICE, test_data, model_path):
+def test_cellpose(DEVICE, test_data, tp_thresholds, model_path):
     test_dir = Path("tmp/cellpose_test")
     masks_ext = "_mask"
     prepare_cellpose_folder(test_data, test_dir, mask_suffix=masks_ext)
     output = io.load_train_test_data(str(test_dir), None,
                                      mask_filter=masks_ext)
-    test_data, test_labels, _, _, _, _ = output
+    test_images, test_labels, _, _, _, _ = output
 
     # Reload trained model
     model = models.CellposeModel(gpu=True, pretrained_model=model_path)
+    model = models.CellposeModel(gpu=True, model_type='nuclei')
 
-    masks = model.eval(test_data, batch_size=32)[0]
-    ap = metrics.average_precision(test_labels, masks)[0]
+    pred_masks = model.eval(test_images, batch_size=32)[0]
+    ap = metrics.average_precision(test_labels, pred_masks)[0]
     print(f'\n>>> Average Precision @ IoU 0.5: {ap[:, 0].mean():.3f}')
 
-    # Plot predictions
-    plt.figure(figsize=(12, 8), dpi=150)
-    for k, img in enumerate(test_data):
-        plt.subplot(3, len(test_data), k + 1)
-        plt.imshow(img)
-        plt.axis('off')
-        if k == 0:
-            plt.title('image')
+    gt_instances = convert_masks_to_instances(test_labels)  # List of (n_gt_objects, 256, 256)
+    pred_instances = convert_masks_to_instances(pred_masks)
 
-        plt.subplot(3, len(test_data), len(test_data) + k + 1)
-        plt.imshow(masks[k])
-        plt.axis('off')
-        if k == 0:
-            plt.title('predicted labels')
+    all_aps_per_threshold = {threshold: [] for threshold in tp_thresholds}
 
-        plt.subplot(3, len(test_data), 2 * len(test_data) + k + 1)
-        plt.imshow(test_labels[k])
-        plt.axis('off')
-        if k == 0:
-            plt.title('true labels')
-    plt.tight_layout()
-    plt.show()
+    for i in range(len(gt_instances)):
 
+        for threshold in tp_thresholds:
+            TP, FP, FN = calculate_metrics(pred_instances[i], gt_instances[i],
+                                           threshold=threshold)
+            AP = average_precision(TP, FP, FN)
+            all_aps_per_threshold[threshold].append(AP)  # Store AP for this threshold
+            print(f"Sample {i}, IoU Threshold: {threshold}, AP: {AP}, TP: {TP}, FP: {FP}, FN: {FN}")
+
+        plot_instance_segmentation(
+            detections=pred_instances[i],
+            ground_truth=gt_instances[i],
+            image=torch.from_numpy(test_images[i]),
+            bounding_boxes=[],
+            threshold=0.7,
+            epoch=0,
+            img_name=f"image_{i}.png",
+            output_path="",
+            mode="test"
+        )
+    # Compute mean AP across all samples for each threshold
+    mean_aps = {threshold: np.mean(aps) for threshold, aps in all_aps_per_threshold.items()}
+
+    mean_ap_df = pd.DataFrame(list(mean_aps.items()), columns=["IoU Threshold", "Mean AP"])
+
+    # Print the DataFrame
+    print(mean_ap_df)
     shutil.rmtree(test_dir, ignore_errors=True)

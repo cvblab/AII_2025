@@ -38,6 +38,10 @@ def get_dataset_path(data, mode):
         images_path = f"../datasets/subtilis/{mode}/fluorescence/*.png"
         masks_path = f"../datasets/subtilis/{mode}/masks/*.png"
 
+    elif data == "neurips":
+        images_path = f"../datasets/neurips/{mode}/images/*"
+        masks_path = f"../datasets/neurips/{mode}/labels/*"
+
     return images_path, masks_path
 
 
@@ -55,6 +59,12 @@ def create_dataset(images_path, masks_path, preprocess=True, axis_norm=(0, 1)):
         "path": paths,
     }
 
+    # dataset_dict = {
+    #     "image": [Image.fromarray(np.uint8(img)) for img in images],
+    #     "label": [Image.fromarray(np.uint8(mask)) for mask in masks],
+    #     "path": paths,
+    # }
+
     # Create the Dataset object from the dictionary
     dataset = Dataset.from_dict(dataset_dict)
 
@@ -65,7 +75,7 @@ def read_image(path):
     ext = os.path.splitext(path)[1].lower()
     if ext in ['.tif', '.tiff']:
         img = tifffile.imread(path)
-    elif ext in ['.png', '.jpg', '.jpeg']:
+    elif ext in ['.png', '.jpg', '.jpeg', '.bmp']:
         img = imageio.imread(path)
     else:
         raise ValueError(f"Unsupported file format: {ext}")

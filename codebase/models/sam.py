@@ -4,7 +4,7 @@ import os
 import numpy as np
 from codebase.utils.metrics import calculate_metrics,  average_precision
 from codebase.utils.visualize import plot_ap,plot_instance_segmentation,plot_loss, calculate_bbox_accuracy,plot_semantic_segmentation
-from codebase.utils.test_utils import get_yolo_bboxes, nms, pad_predictions
+from codebase.utils.test_utils import get_yolo_bboxes, nms, pad_predictions, fill_small_holes_in_masks
 from codebase.models.unet_semantic_segmentation import predict_binary_mask
 import torch.nn as nn
 import monai
@@ -118,8 +118,8 @@ def train_sam(DEVICE, train_data, num_epochs, threshold, backbone, output_path):
             torch.save(model.state_dict(), best_model_path)
             print(f"Best model weights updated with AP: {best_ap:.4f}, saved at {best_model_path}")
 
-        plot_loss(losses_list, epoch, output_path)
-        plot_ap(average_precisions_list, epoch, output_path)
+    plot_loss(losses_list, num_epochs, output_path)
+    plot_ap(average_precisions_list, num_epochs, output_path)
 
 
 def test_sam(DEVICE, test_data, sam_model_path, semantic_seg_model_path, yolo_path, tp_thresholds, nms_iou_threshold, backbone, semantic=False):

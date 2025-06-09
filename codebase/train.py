@@ -7,12 +7,13 @@ from models.unettorch import train_unet
 from models.stardist import train_stardist
 from models.unet_semantic_segmentation import train_semantic_seg
 from models.cellpose_model import train_cellpose
+from codebase.utils.visualize import plot_imgs, plot_instance_segmentation
 
 if __name__ == "__main__":
     print(torch.version.cuda)
     print("torch version:", torch.__version__)
 
-    data = "aureus" # aureus  dsb  mixed  breast subtilis
+    data = "aureus" # aureus  dsb  mixed  breast subtilis neurips
     mode = "train"
     images_path, masks_path = get_dataset_path(data, mode)
     dataset = create_dataset(images_path, masks_path, preprocess=True, axis_norm=(0, 1))
@@ -25,11 +26,13 @@ if __name__ == "__main__":
     # Initialize SAMDataset and DataLoader
     processor = SamProcessor.from_pretrained("facebook/sam-vit-base")
     train_dataset = SegDataset(dataset=dataset, processor=processor)
-    train_data = DataLoader(train_dataset, batch_size=16, shuffle=True, collate_fn=custom_collate_fn)
+    train_data = DataLoader(train_dataset, batch_size=2, shuffle=True, collate_fn=custom_collate_fn)
+    plot_imgs(train_data)
 
-    model_type = "cellpose"  # or "unet", "stardist" "sam"
-    num_epochs = 5
-    threshold = 0.7
+
+    model_type = "sam"  # or "unet", "stardist" "sam"
+    num_epochs = 50
+    threshold = 0.5
     output_path = "../logs/training/" + model_type + "/" + data
 
     if model_type == "sam": # base large huge

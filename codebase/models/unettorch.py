@@ -108,18 +108,17 @@ def train_unet(DEVICE, train_data, num_epochs, threshold, output_path):
                     batched_cells_predictions = model(input_sub_batch.float())
                     batched_cells_predictions = batched_cells_predictions.permute(0, 2, 3, 1)
 
-                    print("Pred min:", batched_cells_predictions.min(), "max:", batched_cells_predictions.max())
-                    #probs = torch.sigmoid(batched_cells_predictions)
-
+                    probs = torch.sigmoid(batched_cells_predictions)
+                    binary_preds = (probs > 0.98).float()
                     visualize_single_cells(input_tensor=input_sub_batch, gt_masks=masks_sub_batch,
-                                      preds=batched_cells_predictions)
+                                      preds=batched_cells_predictions, binary_preds=binary_preds)
 
                     sub_batch_loss = bce_loss_fn(masks_sub_batch, batched_cells_predictions)
 
                     print("loss: " ,sub_batch_loss)
 
-                    pred_masks.extend(batched_cells_predictions.detach().cpu()) # detach for metric computation
-
+                    #pred_masks.extend(batched_cells_predictions.detach().cpu()) # detach for metric computation
+                    pred_masks.extend(binary_preds.detach().cpu())
                     total_loss_tensor += sub_batch_loss   # accumulate tensor
                     total_loss_image += sub_batch_loss.item()  # accumulate for logging
 

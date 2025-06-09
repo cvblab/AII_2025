@@ -1,6 +1,7 @@
 import torch
 from ultralytics import YOLO
 import numpy as np
+from skimage.morphology import remove_small_holes
 
 def nms(boxes, scores, iou_threshold=0.5):
 
@@ -68,3 +69,47 @@ def pad_predictions(gt_masks, pred_masks):
         pred_masks = pred_masks[:gt_num_objects]
 
     return pred_masks
+
+def convert_masks_to_instances(mask_list):
+    """
+    Converts a list of labeled masks into a list of binary instance masks.
+
+    Input:
+        mask_list: list of (256, 256) numpy arrays with labeled integers (0=background, 1+ = object IDs)
+
+    Output:
+        instance_masks_list: list of arrays with shape (num_objects, 256, 256)
+    """
+    instance_masks_list = []
+
+    for mask in mask_list:
+        instance_ids = np.unique(mask)
+        instance_ids = instance_ids[instance_ids != 0]  # Exclude background
+
+        if len(instance_ids) == 0:
+            instance_masks = np.zeros((0, 256, 256), dtype=np.uint8)
+        else:
+            instance_masks = np.stack([(mask == inst_id).astype(np.uint8) for inst_id in instance_ids])
+
+        instance_masks_list.append(instance_masks)
+
+    return instance_masks_list
+
+
+def fill_small_holes_in_masks(masks: np.ndarray, area_threshold: int = 100) -> np.ndarray:
+    """
+    Fill small holes in binary instance masks.
+
+    Args:
+        masks (np.ndarray): Array of shape (num_cells, H, W) with binary values (0 or 1).
+        area_threshold (int): Maximum area of small holes to fill.
+
+    Returns:
+        np.ndarray: Array of same shape as input with small holes filled.
+    """
+    filled_masks = []
+    for i, mask in enumerate(masks):
+        filled = remove_small_holes(mask.astype(bool), area_threshold=area_threshold)
+        filled_masks.append(filled.astype(np.uint8))
+
+    return np.array(filled_masks)

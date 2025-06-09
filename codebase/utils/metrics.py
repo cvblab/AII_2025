@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import torch
+from segmentation_models_pytorch.losses import DiceLoss
 import os
 
 def calculate_iou(pred_mask, gt_mask):
@@ -26,7 +27,6 @@ def metrics_semantic_segmentation(pred_mask_bin, gt_mask):
     precision = TP / (TP + FP + 1e-8)
     recall = TP / (TP + FN + 1e-8)
     f1 = 2 * precision * recall / (precision + recall + 1e-8)
-
     return TP, FP, FN, precision, recall, f1
 
 def calculate_metrics(detections, ground_truth, threshold):

@@ -1,9 +1,11 @@
 import numpy as np
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
+from matplotlib import gridspec
 import torch
 import os
 from codebase.utils.metrics import calculate_iou
+from codebase.utils.test_utils import fill_small_holes_in_masks
 
 def plot_bboxes_nms(ax, image, bboxes):
     ax.imshow(image, cmap="gray")  # Assuming a grayscale image
@@ -62,6 +64,10 @@ def plot_instance_segmentation(detections, ground_truth, image, bounding_boxes, 
     axs[0].axis('off')
 
     # Combine ground truth masks for visualization (assign consistent colors)
+    print("ground_truth shape:", ground_truth.shape)
+
+    if ground_truth.ndim == 2:
+        ground_truth = np.expand_dims(ground_truth, axis=0)
     combined_ground_truth_color = np.zeros((ground_truth.shape[1], ground_truth.shape[2], 3), dtype=np.uint8)
     for i in range(num_objects):
         combined_ground_truth_color[ground_truth[i] > 0] = colors[i]  # Use consistent color per object
@@ -88,6 +94,7 @@ def plot_instance_segmentation(detections, ground_truth, image, bounding_boxes, 
 
     # Combine predicted masks for visualization (assign same colors)
     detections = (detections > 0.5).astype(np.uint8)
+    detections = fill_small_holes_in_masks(detections, area_threshold=100)
     combined_detections = np.zeros((detections.shape[1], detections.shape[2], 3), dtype=np.uint8)
     for i in range(num_detections):
         #combined_detections[detections[i] > 0] = colors[i]  # Use same color for corresponding object
@@ -179,48 +186,79 @@ def plot_semantic_segmentation(pred_mask, gt_mask, input_tensor):
 
 
 
-def visualize_single_cells(input_tensor, gt_masks, preds):
+def visualize_single_cells(input_tensor, gt_masks, preds, binary_preds):
     if torch.is_tensor(input_tensor):
         input_tensor = input_tensor.cpu().numpy()
     if torch.is_tensor(gt_masks):
         gt_masks = gt_masks.cpu().numpy()
     if torch.is_tensor(preds):
         preds = preds.cpu().detach().numpy()
+    if torch.is_tensor(binary_preds):
+        binary_preds = binary_preds.cpu().detach().numpy()
 
     for i in range(len(input_tensor)):
-        image = input_tensor[i, 0, :, :]  # First channel: grayscale image
-        bbox_mask = input_tensor[i, 1, :, :]  # Second channel: bbox mask
+        image = input_tensor[i, 0, :, :]  # Grayscale image
+        bbox_mask = input_tensor[i, 1, :, :]  # BBox channel
 
         gt_mask = gt_masks[i]
         pred = preds[i]
+        binary_pred = binary_preds[i]
 
-        fig, axs = plt.subplots(1, 4, figsize=(12, 4))
+        fig = plt.figure(figsize=(20, 8))
+        gs = gridspec.GridSpec(2, 5, width_ratios=[1, 1, 1, 1, 1.2])
 
-        axs[0].imshow(image, cmap='gray')
-        axs[0].set_title(f"Image {i + 1}")
-        axs[0].axis('off')
+        ax0 = plt.subplot(gs[0, 0])
+        ax0.imshow(image, cmap='gray')
+        ax0.set_title("Image")
+        ax0.axis('off')
 
-        axs[1].imshow(bbox_mask, cmap='Reds')
-        axs[1].set_title("BBox Mask")
-        axs[1].axis('off')
+        ax1 = plt.subplot(gs[0, 1])
+        ax1.imshow(bbox_mask, cmap='Reds')
+        ax1.set_title("BBox Mask")
+        ax1.axis('off')
 
-        axs[2].imshow(gt_mask, cmap='Greens')
-        axs[2].set_title("GT Mask")
-        axs[2].axis('off')
+        ax2 = plt.subplot(gs[0, 2])
+        ax2.imshow(gt_mask, cmap='Greens')
+        ax2.set_title("GT Mask")
+        ax2.axis('off')
 
-        # Displaying the thresholded prediction
-        axs[3].imshow(pred, cmap='Greens')
-        axs[3].set_title("Pred")
-        axs[3].axis('off')
+        ax3 = plt.subplot(gs[0, 3])
+        ax3.imshow(pred, cmap='Greens')
+        ax3.set_title("Pred")
+        ax3.axis('off')
 
-        plt.tight_layout()
+        ax4 = plt.subplot(gs[1, 1])
+        ax4.imshow(binary_pred, cmap='Greens')
+        ax4.set_title("Binary Prediction")
+        ax4.axis('off')
+
+        # Histogram of all logits
+        ax5 = plt.subplot(gs[1, 2])
+        ax5.hist(pred.flatten(), bins=100, color='blue', alpha=0.7)
+        ax5.set_title("Logit Value Distribution (All Pixels)")
+        ax5.set_xlabel("Logit value")
+        ax5.set_ylabel("Frequency")
+        ax5.grid(True)
+
+        # Histogram of only high logits (above 95th percentile)
+        threshold = np.percentile(pred, 95)
+        high_vals = pred[pred > threshold]
+
+        ax6 = plt.subplot(gs[1, 3:])
+        ax6.hist(high_vals.flatten(), bins=50, color='orange', alpha=0.7)
+        ax6.set_title(f"High Logits > 95th Percentile ({threshold:.2f})")
+        ax6.set_xlabel("Logit value")
+        ax6.set_ylabel("Frequency")
+        ax6.grid(True)
+
+        plt.suptitle(f"Visualization for Sample {i + 1}", fontsize=16)
+        plt.tight_layout(rect=[0, 0, 1, 0.95])
         plt.show()
-
 
 def plot_loss(epoch_losses_list,num_epochs,output_path):
     # Plot the metrics after training
     plt.figure(figsize=(12, 6))
-    plt.plot(range(1, num_epochs + 1), epoch_losses_list, marker='o', label='Loss')
+    plt.plot(range(0, num_epochs + 1), epoch_losses_list, marker='o', label='Loss')
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
     plt.title('Epoch Loss')
@@ -354,4 +392,42 @@ def plot_bboxes(image, gt_bboxes, pred_bboxes, tp_indices, fp_indices):
 
     plt.tight_layout()
     plt.show()
+
+import matplotlib.pyplot as plt
+import torch
+from torchvision.utils import draw_bounding_boxes
+from torchvision.transforms.functional import to_pil_image
+from tqdm import tqdm
+
+
+
+def plot_imgs(data):
+
+    for batch_index, batch in enumerate(tqdm(data)):
+        # Assumes a batched dictionary          # (B, C, H, W) tensor
+
+        if batch is None or len(batch["image"]) == 0:
+            print(f"Skipping empty batch {batch_index}.")
+            continue
+
+        for item_index in range(len(batch["image"])):
+
+            num_objects = batch["num_objects_per_image"][item_index]
+            print("objects",num_objects)
+            valid_bboxes = batch["bounding_boxes"][item_index][:num_objects]
+            valid_gt_masks = batch['instance_gt_masks'][item_index][:num_objects].float().unsqueeze(-1)
+
+
+            plot_instance_segmentation(
+                detections=valid_gt_masks.cpu().numpy().squeeze(),
+                ground_truth=valid_gt_masks.cpu().numpy().squeeze(),
+                image=batch["image"][item_index],
+                bounding_boxes=valid_bboxes,
+                threshold=0.5,
+                epoch=0,
+                img_name="",
+                output_path="",
+                mode="test"
+            )
+
 

@@ -2,12 +2,18 @@ import torch
 from codebase.utils.visualize import plot_semantic_segmentation, plot_loss
 from codebase.utils.metrics import metrics_semantic_segmentation
 import segmentation_models_pytorch as smp
+from segmentation_models_pytorch.losses import DiceLoss
 import torch.nn as nn
 import torch.optim as optim
 from tqdm import tqdm
 import os
 import pandas as pd
 
+# Combined loss function
+def combined_loss(pred, target, alpha=0.3):
+    dice_loss = DiceLoss(mode='binary')
+    bce_loss = nn.BCEWithLogitsLoss()
+    return alpha * bce_loss(pred, target) + (1 - alpha) * dice_loss(pred, target)
 
 def train_semantic_seg(DEVICE, train_data, num_epochs, output_path, patience=5, min_delta=1e-4, f1_threshold=0.90):
     print("Training U-net for semantic segmentation")
@@ -19,6 +25,8 @@ def train_semantic_seg(DEVICE, train_data, num_epochs, output_path, patience=5, 
     ).to(DEVICE)
 
     criterion = nn.BCEWithLogitsLoss()
+    dice_loss_fn = DiceLoss(mode='binary')
+
     optimizer = optim.Adam(model.parameters(), lr=1e-4)
 
     os.makedirs(output_path, exist_ok=True)
@@ -30,7 +38,8 @@ def train_semantic_seg(DEVICE, train_data, num_epochs, output_path, patience=5, 
     for epoch in range(num_epochs):
         model.train()
         total_loss = 0
-        total_TP, total_FP, total_FN = 0, 0, 0
+        dice_scores = []
+        total_TP, total_FP, total_FN, total_dice_score = 0, 0, 0, 0
 
         print(f"\nEpoch {epoch + 1}/{num_epochs}")
         for batch_index, batch in enumerate(tqdm(train_data, desc="Training")):
@@ -46,7 +55,8 @@ def train_semantic_seg(DEVICE, train_data, num_epochs, output_path, patience=5, 
 
                 optimizer.zero_grad()
                 pred = model(input_tensor.unsqueeze(0))
-                loss = criterion(pred, gt_mask.unsqueeze(0))
+                #loss = criterion(pred, gt_mask.unsqueeze(0))
+                loss = combined_loss(pred, gt_mask.unsqueeze(0))
                 loss.backward()
                 optimizer.step()
 
@@ -54,10 +64,14 @@ def train_semantic_seg(DEVICE, train_data, num_epochs, output_path, patience=5, 
 
                 pred_mask_bin = (torch.sigmoid(pred) > 0.5).float()
                 TP, FP, FN, _, _, _ = metrics_semantic_segmentation(pred_mask_bin, gt_mask)
+                dice_loss = dice_loss_fn(pred, gt_mask.unsqueeze(0))
+                dice_score = 1 - dice_loss.item()
 
                 total_TP += TP
                 total_FP += FP
                 total_FN += FN
+                total_dice_score += dice_score
+                dice_scores.append(dice_score)
 
                 if epoch % 5 == 0 or epoch == num_epochs - 1:
                     plot_semantic_segmentation(pred_mask_bin, gt_mask, input_tensor)
@@ -65,8 +79,8 @@ def train_semantic_seg(DEVICE, train_data, num_epochs, output_path, patience=5, 
         precision = total_TP / (total_TP + total_FP + 1e-8)
         recall = total_TP / (total_TP + total_FN + 1e-8)
         f1 = 2 * precision * recall / (precision + recall + 1e-8)
-
-        print(f"Loss: {total_loss:.4f} | Precision: {precision:.4f} | Recall: {recall:.4f} | F1: {f1:.4f}")
+        dice = total_dice_score / len(dice_scores)
+        print(f"Loss: {total_loss:.4f} | Precision: {precision:.4f} | Recall: {recall:.4f} | F1: {f1:.4f} | Dice Score: {dice:.4f}")
         losses.append(total_loss)
 
         # Early stopping check
@@ -97,8 +111,9 @@ def test_semantic_segmentation(DEVICE, test_data, model_path):
 
     model.load_state_dict(torch.load(model_path, map_location=DEVICE))
     model.eval()
+    dice_loss_fn = DiceLoss(mode='binary')
 
-    total_TP, total_FP, total_FN = 0, 0, 0
+    total_TP, total_FP, total_FN, total_dice_score = 0, 0, 0, 0
     results = []
 
     for index, test_sample in enumerate(test_data):
@@ -112,6 +127,8 @@ def test_semantic_segmentation(DEVICE, test_data, model_path):
             pred_mask_bin = (torch.sigmoid(pred) > 0.5).float().squeeze().cpu()
 
         TP, FP, FN,precision, recall, f1 = metrics_semantic_segmentation(pred_mask_bin, gt_mask.cpu())
+        dice_loss = dice_loss_fn(pred, gt_mask.unsqueeze(0))
+        dice_score = 1 - dice_loss.item()
 
         results.append({
             "sample_index": index,
@@ -120,12 +137,14 @@ def test_semantic_segmentation(DEVICE, test_data, model_path):
             "FN": FN,
             "Precision": precision,
             "Recall": recall,
-            "F1": f1
+            "F1": f1,
+            "Dice_score": dice_score
         })
 
         total_TP += TP
         total_FP += FP
         total_FN += FN
+        total_dice_score += dice_score
 
         plot_semantic_segmentation(pred_mask_bin, gt_mask, input_tensor)
 
@@ -133,8 +152,9 @@ def test_semantic_segmentation(DEVICE, test_data, model_path):
     global_precision = total_TP / (total_TP + total_FP + 1e-8)
     global_recall = total_TP / (total_TP + total_FN + 1e-8)
     global_f1 = 2 * global_precision * global_recall / (global_precision + global_recall + 1e-8)
+    global_dice = total_dice_score / len(results)
 
-    print(f"\nGlobal Precision: {global_precision:.4f} | Recall: {global_recall:.4f} | F1: {global_f1:.4f}")
+    print(f"\nGlobal Precision: {global_precision:.4f} | Recall: {global_recall:.4f} | F1: {global_f1:.4f}, | Dice Score: {global_dice:.4f}")
 
     # Convert to DataFrame
     df_results = pd.DataFrame(results)

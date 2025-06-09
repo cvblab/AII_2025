@@ -14,7 +14,7 @@ if __name__ == "__main__":
     print(torch.version.cuda)
     print("torch version:", torch.__version__)
 
-    data = "aureus"  # aureus  dsb  mixed  breast subtilis
+    data = "subtilis"  # aureus  dsb  mixed  breast subtilis
     mode = "test"
     images_path, masks_path = get_dataset_path(data, mode)
     dataset = create_dataset(images_path, masks_path, preprocess=True, axis_norm=(0, 1))
@@ -28,14 +28,14 @@ if __name__ == "__main__":
     test_dataset = SegDataset(dataset=dataset, processor=processor)
     test_data = DataLoader(test_dataset, batch_size=1, shuffle=True, collate_fn=custom_collate_fn)
 
-    model_type = "cellpose"  # or "unet", "stardist" "sam"
-    semantic = True
+    model_type = "semantic_segmentation"  # or "unet", "stardist" "sam"
+    semantic = False
     threshold = 0.7
     nms_iou_threshold = 0.5
     tp_thresholds = [round(th, 2) for th in np.arange(0.5, 1.0, 0.05)]
     instance_seg_model_path = "../weights/sam/sam_model_dsb_best.pth"
-    semantic_seg_model_path = "../logs/training/semantic/breast/unet_final_epoch49.pth"
-    yolo_path = "yolov8/runs/yolov8_dsb_masks/weights/best.pt"
+    semantic_seg_model_path = f"../logs/training/semantic2/{data}/unet_final_epoch45.pth"
+    yolo_path = "yolov8/runs/yolov8_dsb/weights/best.pt"
     cellpose_path = f"models/cellpose/cellpose_{data}"
 
     if model_type == "sam":
@@ -47,4 +47,4 @@ if __name__ == "__main__":
     elif model_type == "semantic_segmentation":
         test_semantic_segmentation(DEVICE, test_data, semantic_seg_model_path)
     elif model_type == "cellpose":
-        test_cellpose(DEVICE, test_data, cellpose_path)
+        test_cellpose(DEVICE, test_data, tp_thresholds, cellpose_path)
