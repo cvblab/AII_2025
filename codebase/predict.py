@@ -5,7 +5,7 @@ from codebase.data.dataset import SegDataset, create_dataset, custom_collate_fn,
 import numpy as np
 from codebase.models.sam import test_sam
 from codebase.models.stardist import test_stardist
-from codebase.models.unettorch import test_unet
+from codebase.models.unet import test_unet
 from codebase.models.unet_semantic_segmentation import test_semantic_segmentation
 from codebase.models.cellpose_model import test_cellpose
 
@@ -35,7 +35,7 @@ if __name__ == "__main__":
     tp_thresholds = [round(th, 2) for th in np.arange(0.5, 1.0, 0.05)]
     instance_seg_model_path = "../weights/sam/sam_model_dsb_best.pth"
     semantic_seg_model_path = f"../logs/training/semantic2/{data}/unet_final_epoch45.pth"
-    yolo_path = "yolov8/runs/yolov8_dsb/weights/best.pt"
+    yolo_path = f"../logs/training/yolov8_{data}/weights/best.pt"
     cellpose_path = f"models/cellpose/cellpose_{data}"
 
     if model_type == "sam":

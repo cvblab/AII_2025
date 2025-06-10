@@ -1,11 +1,12 @@
 import numpy as np
 import matplotlib.patches as patches
-import matplotlib.pyplot as plt
 from matplotlib import gridspec
-import torch
 import os
 from codebase.utils.metrics import calculate_iou
 from codebase.utils.test_utils import fill_small_holes_in_masks
+import matplotlib.pyplot as plt
+import torch
+from tqdm import tqdm
 
 def plot_bboxes_nms(ax, image, bboxes):
     ax.imshow(image, cmap="gray")  # Assuming a grayscale image
@@ -39,12 +40,22 @@ def plot_nms(image, gt_boxes, original_bboxes, filtered_bboxes, iou_threshold):
     plt.tight_layout()
     plt.show()
 
+
 def plot_instance_segmentation(detections, ground_truth, image, bounding_boxes, threshold, epoch, img_name, output_path, mode):
     """
        Detections and ground_truth numpy array (n_objects, 256, 256)
        Image torch tensor (256,256,3)
        Plots original image, ground truth, input_prompt, predictions, and TP,FP
        """
+    print(f"Image dtype: {image.dtype}, min: {image.min()}, max: {image.max()}")
+
+    if ground_truth.ndim == 2:
+        ground_truth = np.expand_dims(ground_truth, axis=0)
+
+    if detections.ndim == 2:
+        detections = np.expand_dims(detections, axis=0)
+
+    print("ground_truth shape:", ground_truth.shape)
     num_objects = ground_truth.shape[0]  # Number of objects
     num_detections = detections.shape[0]  # Number of detected objects
 
@@ -54,8 +65,10 @@ def plot_instance_segmentation(detections, ground_truth, image, bounding_boxes, 
     # Plot combined ground truth and predicted masks with the same colors for corresponding objects
     fig, axs = plt.subplots(1, 5, figsize=(20, 5))
 
+    if isinstance(image, torch.Tensor):
+        image = image.cpu().numpy()
     # Transpose image for correct display (if it's in CHW format)
-    if image.shape[-1] != 3:
+    if image.ndim == 3 and image.shape[0] == 3:  # likely CHW format
         image = np.transpose(image, (1, 2, 0))
 
     # Plot original image
@@ -64,10 +77,7 @@ def plot_instance_segmentation(detections, ground_truth, image, bounding_boxes, 
     axs[0].axis('off')
 
     # Combine ground truth masks for visualization (assign consistent colors)
-    print("ground_truth shape:", ground_truth.shape)
-
-    if ground_truth.ndim == 2:
-        ground_truth = np.expand_dims(ground_truth, axis=0)
+    num_objects = ground_truth.shape[0]
     combined_ground_truth_color = np.zeros((ground_truth.shape[1], ground_truth.shape[2], 3), dtype=np.uint8)
     for i in range(num_objects):
         combined_ground_truth_color[ground_truth[i] > 0] = colors[i]  # Use consistent color per object
@@ -145,6 +155,10 @@ def plot_instance_segmentation(detections, ground_truth, image, bounding_boxes, 
         os.makedirs(output_dir, exist_ok=True)  # Create the directory if it doesn't exist
         # Filepath to save the plot
         output_path = os.path.join(output_dir, img_name)
+        base, ext = os.path.splitext(output_path)
+        if ext.lower() == '.bmp':
+            output_path = base + '.png'
+
         plt.savefig(output_path, dpi=300)
 
     # else:
@@ -255,6 +269,7 @@ def visualize_single_cells(input_tensor, gt_masks, preds, binary_preds):
         plt.tight_layout(rect=[0, 0, 1, 0.95])
         plt.show()
 
+
 def plot_loss(epoch_losses_list,num_epochs,output_path):
     # Plot the metrics after training
     plt.figure(figsize=(12, 6))
@@ -270,6 +285,7 @@ def plot_loss(epoch_losses_list,num_epochs,output_path):
     plt.savefig(plot_save_path)
     #plt.show()
 
+
 def plot_ap(average_precisions_list,num_epochs,output_path):
     plt.figure(figsize=(12, 6))
     plt.plot(range(0, num_epochs + 1), average_precisions_list, marker='o', color='orange', label='AP')
@@ -284,6 +300,7 @@ def plot_ap(average_precisions_list,num_epochs,output_path):
     plot_save_path = f"{output_folder}/{num_epochs}_ap.png"
     plt.savefig(plot_save_path)
     #plt.show()
+
 
 def calculate_bbox_accuracy(ground_truth_boxes, predicted_boxes, iou_threshold=0.5):
     """
@@ -351,6 +368,7 @@ def calculate_bbox_accuracy(ground_truth_boxes, predicted_boxes, iou_threshold=0
     print(f"Boxes: {len(ground_truth_boxes)}, TP: {TP}, FP: {FP}, FN: {FN}, Precision: {precision}, Recall: {recall}, F1: {f1_score}")
     return TP,FP,FN,precision,recall,f1_score,tp_indices,fp_indices
 
+
 def plot_bboxes(image, gt_bboxes, pred_bboxes, tp_indices, fp_indices):
     """
     Plots ground truth boxes, predicted boxes, and TP/FP boxes on an image.
@@ -392,13 +410,6 @@ def plot_bboxes(image, gt_bboxes, pred_bboxes, tp_indices, fp_indices):
 
     plt.tight_layout()
     plt.show()
-
-import matplotlib.pyplot as plt
-import torch
-from torchvision.utils import draw_bounding_boxes
-from torchvision.transforms.functional import to_pil_image
-from tqdm import tqdm
-
 
 
 def plot_imgs(data):

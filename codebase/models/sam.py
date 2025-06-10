@@ -86,7 +86,7 @@ def train_sam(DEVICE, train_data, num_epochs, threshold, backbone, output_path):
                     plot_instance_segmentation(
                         detections=pred_masks.detach().cpu().numpy(),
                         ground_truth=valid_gt_masks.cpu().numpy(),
-                        image=batch["image"][item_index],
+                        image=batch["original_image"][item_index],
                         bounding_boxes=batch["bounding_boxes"][item_index],
                         threshold=threshold,
                         epoch=epoch,

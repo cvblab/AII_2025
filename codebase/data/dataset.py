@@ -53,17 +53,17 @@ def create_dataset(images_path, masks_path, preprocess=True, axis_norm=(0, 1)):
         images, masks = preprocess_data(images, masks, axis_norm)
 
     # Create a dictionary with images and masks as PIL images
-    dataset_dict = {
-        "image": [Image.fromarray(img) for img in images],
-        "label": [Image.fromarray(mask) for mask in masks],
-        "path": paths,
-    }
-
     # dataset_dict = {
-    #     "image": [Image.fromarray(np.uint8(img)) for img in images],
-    #     "label": [Image.fromarray(np.uint8(mask)) for mask in masks],
+    #     "image": [Image.fromarray(img) for img in images],
+    #     "label": [Image.fromarray(mask) for mask in masks],
     #     "path": paths,
     # }
+
+    dataset_dict = {
+        "image": [Image.fromarray(np.uint8(img)) for img in images],
+        "label": [Image.fromarray(np.uint8(mask)) for mask in masks],
+        "path": paths,
+    }
 
     # Create the Dataset object from the dictionary
     dataset = Dataset.from_dict(dataset_dict)
@@ -78,7 +78,8 @@ def read_image(path):
     elif ext in ['.png', '.jpg', '.jpeg', '.bmp']:
         img = imageio.imread(path)
     else:
-        raise ValueError(f"Unsupported file format: {ext}")
+        print(f"Skipping unsupported file: {path}")
+        return None
 
     # Convert RGB to grayscale if needed
     if img.ndim == 3 and img.shape[2] == 3:
@@ -86,15 +87,28 @@ def read_image(path):
 
     return img.astype(np.float32)
 
+
 def load_data(images_path, masks_path):
     image_files = sorted(glob.glob(images_path))
     mask_files = sorted(glob.glob(masks_path))
 
-    images = [read_image(img) for img in image_files]
-    masks = [read_image(mask).astype(np.int32) for mask in mask_files]
+    filtered_images = []
+    filtered_image_files = []
+    for path in image_files:
+        img = read_image(path)
+        if img is not None:
+            filtered_images.append(img)
+            filtered_image_files.append(path)
 
-    return images, masks, image_files
+    filtered_masks = []
+    filtered_mask_files = []
+    for path in mask_files:
+        img = read_image(path)
+        if img is not None:
+            filtered_masks.append(img.astype(np.int32))
+            filtered_mask_files.append(path)
 
+    return filtered_images, filtered_masks, filtered_image_files
 
 class SegDataset(TorchDataset):
     """
@@ -115,75 +129,88 @@ class SegDataset(TorchDataset):
         mask = np.array(item["label"])
         path = np.array(item["path"])
 
-        # Check if the image is grayscale and convert it to RGB
-        if image.ndim == 2:  # Image is grayscale
-            image = np.expand_dims(image, axis=-1)  # Expand dimensions to (H, W, 1)
-            image = np.repeat(image, 3, axis=2)  # Repeat the grayscale values across the new channel dimension
+        # Convert grayscale to RGB
+        if image.ndim == 2:
+            image = np.expand_dims(image, axis=-1)
+            image = np.repeat(image, 3, axis=2)
 
-        # If the image is larger than crop size, crop it at the center
-
+        # Crop if necessary
         if image.shape[0] > self.crop_size or image.shape[1] > self.crop_size:
-
             if image.dtype != np.uint8:
-                # image = np.array(image, dtype=np.float32)  # Convert to float to prevent truncation
-                # image = np.clip(image / 256, 0, 255).astype(np.uint8)  # Normalize and convert to uint8
                 image = np.clip(image, 0, 1.0) * 255.0
                 image = image.astype(np.uint8)
 
-            image = self.cropper(Image.fromarray(image))  # Center crop image
-            mask = self.cropper(Image.fromarray(mask))  # Center crop mask
+            image = self.cropper(Image.fromarray(image))
+            mask = self.cropper(Image.fromarray(mask))
             image = np.array(image)
             mask = np.array(mask)
 
-        # Generate individual instance masks (assuming objects are labeled with unique values)
+        if image.shape != (self.crop_size, self.crop_size, 3):
+            print(f"[INFO] Skipping image with invalid shape: {image.shape}, path: {path}")
+            return None
+
+        # Handle instance masks and bounding boxes
         object_ids = np.unique(mask)
         object_ids = object_ids[object_ids != 0]
-        instance_masks = []
-        bounding_boxes = []
-
         if len(object_ids) == 0:
             print(f"[INFO] No objects found in mask: {path}")
             return None
 
+        instance_masks = []
+        bounding_boxes = []
         for obj_id in object_ids:
-            instance_mask = np.where(mask == obj_id, 1, 0)  # Create binary mask for each object
+            instance_mask = np.where(mask == obj_id, 1, 0)
             instance_masks.append(instance_mask)
 
-            # Get bounding box for the object
-            bounding_box_list = get_bounding_boxes(instance_mask)
-
-            for bbox in bounding_box_list:
-                # Only append if the bounding box has exactly 4 coordinates
+            for bbox in get_bounding_boxes(instance_mask):
                 if len(bbox) == 4:
-                    if isinstance(bbox, list):
-                        bbox = np.array(bbox)
-                    bounding_boxes.append(bbox)
+                    bounding_boxes.append(np.array(bbox))
                 else:
-                    print(f"Unexpected bounding box format for object {obj_id}: {bbox}")  # Debug print
+                    print(f"Unexpected bounding box format for object {obj_id}: {bbox}")
 
-        # Convert instance_masks to a tensor of shape [num_objects, H, W]
-        instance_masks = np.stack(instance_masks, axis=0)  # Shape: [num_objects, H, W]
+        instance_masks = np.stack(instance_masks, axis=0)
 
-        # Normalize the image to the range 0-255
-        image = (image - image.min()) / (image.max() - image.min()) * 255
-        image = image.astype(np.uint8)
-        threshold = 50  # Tune this value
-        image[image < threshold] = 0
-        image = image / np.max(image)
+        # Convert image to float32 for normalization and processing
+        image_float = image.astype(np.float32)
 
-        nested_bounding_boxes = [bbox.flatten().tolist() for bbox in bounding_boxes]  # List of boxes for each object
+        # Check for NaNs or Infs
+        if not np.all(np.isfinite(image_float)):
+            print(f"[WARNING] Image has NaN or Inf before normalization. Skipping: {path}")
+            return None
 
-        inputs = self.processor(image, input_boxes=[nested_bounding_boxes], return_tensors="pt",do_rescale=False)
-        inputs = {k: v.squeeze(0) for k, v in inputs.items()}
+        min_val = image_float.min()
+        max_val = image_float.max()
+        denominator = max_val - min_val
+
+        if denominator < 1e-8:
+            image_norm = np.zeros_like(image_float)
+        else:
+            image_norm = (image_float - min_val) / denominator
+
+        # Sanity check normalized image
+        if not np.all(np.isfinite(image_norm)):
+            print(f"[WARNING] Image has NaN or Inf after normalization. Skipping: {path}")
+            return None
+
+        # Prepare inputs for SAM processor using normalized image
+        nested_bounding_boxes = [bbox.flatten().tolist() for bbox in bounding_boxes]
+        try:
+            inputs = self.processor(image_norm, input_boxes=[nested_bounding_boxes], return_tensors="pt", do_rescale=False)
+            inputs = {k: v.squeeze(0) for k, v in inputs.items()}
+        except Exception as e:
+            print(f"[ERROR] Processor failed on sample {path}: {e}")
+            return None
 
         return {
-            "image": torch.tensor(image),  # Original image
+            "image_norm": torch.tensor(image_norm),  # Normalized float image [0,1]
+            "image_uint8": torch.tensor(image, dtype=torch.uint8),  # Original image uint8 [0,255]
             "original_mask": torch.tensor(mask, dtype=torch.float32),
-            "single_instance_masks": torch.tensor(instance_masks, dtype=torch.float32),  # Instance masks
+            "single_instance_masks": torch.tensor(instance_masks, dtype=torch.float32),
             "bounding_boxes": torch.tensor(np.array(bounding_boxes)),
             "path": path,
             **inputs
         }
+
 
 
 def custom_collate_fn(batch):
@@ -194,7 +221,8 @@ def custom_collate_fn(batch):
     if len(batch) == 0:
         return None
 
-    images = torch.stack([item['image'] for item in batch])
+    images = torch.stack([item['image_norm'] for item in batch])
+    images_original = torch.stack([item['image_uint8'] for item in batch])
     pixel_values = torch.stack([item['pixel_values'] for item in batch])
     original_masks = torch.stack([item['original_mask'] for item in batch])
     path = [item['path'] for item in batch]
@@ -244,6 +272,7 @@ def custom_collate_fn(batch):
     return {
         'pixel_values': pixel_values,
         'image': images,
+        'original_image':images_original,
         'original_gt_masks': original_masks,
         'bounding_boxes': padded_boxes,
         'instance_gt_masks': padded_masks,
