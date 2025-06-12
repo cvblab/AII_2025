@@ -2,7 +2,7 @@ from codebase.yolov8.yolo_utils import get_detection_metrics, predict_and_visual
 
 
 if __name__ == '__main__':
-    #train_model(name="yolov8_dsb")  # to yolov8x_dsb18 yolov8
+    train_model(name="yolov8_neurips")  # to yolov8x_dsb18 yolov8
     data = "subtilis"  # aureus  dsb  mixed  breast subtilis
     mode = "test"
     #yolo_weights_path = "../../weights/yolo/yolov8n_dsb18.pt"  # runs/yolov8_dsb_masks/weights/best.pt  # ../../weights/yolo/yolov8n_dsb18.pt

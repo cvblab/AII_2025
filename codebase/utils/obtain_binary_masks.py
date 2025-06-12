@@ -29,6 +29,10 @@ def convert_instance_masks_to_binary(images_dir,masks_dir, output_dir, visualize
         # Correct binary mask conversion
         binary_mask = ((mask > 0).byte().cpu().numpy()) * 255
 
+        ext = os.path.splitext(name)[1].lower()
+        if ext not in ['.tif', '.tiff']:
+            name = os.path.splitext(name)[0] + '.tiff'  # change extension to .tiff
+
         # Save binary mask
         out_path = os.path.join(output_dir, name)
         Image.fromarray(binary_mask).save(out_path)
@@ -55,7 +59,7 @@ def convert_instance_masks_to_binary(images_dir,masks_dir, output_dir, visualize
     print(f"Binary masks saved to: {output_dir}")
 
 if __name__ == "__main__":
-    data = "subtilis"  # aureus  dsb  mixed  breast subtilis
+    data = "neurips"  # aureus  dsb  mixed  breast subtilis neurips
     mode = "train"
     images_path, masks_path = get_dataset_path(data, mode)
     output_dir = f"../yolov8/data/train_{data}/masks/images"

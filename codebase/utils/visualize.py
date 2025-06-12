@@ -71,6 +71,10 @@ def plot_instance_segmentation(detections, ground_truth, image, bounding_boxes, 
     if image.ndim == 3 and image.shape[0] == 3:  # likely CHW format
         image = np.transpose(image, (1, 2, 0))
 
+    # Ensure float32 and scale correctly
+    image = image.astype(np.float32)             # NEW
+    image = np.clip(image, 0.0, 1.0)
+
     # Plot original image
     axs[0].imshow(image)
     axs[0].set_title("Original Image")
@@ -105,6 +109,11 @@ def plot_instance_segmentation(detections, ground_truth, image, bounding_boxes, 
     # Combine predicted masks for visualization (assign same colors)
     detections = (detections > 0.5).astype(np.uint8)
     detections = fill_small_holes_in_masks(detections, area_threshold=100)
+
+    if detections is None or detections.ndim < 3:
+        print("[WARNING] Skipping visualization due to invalid detections.")
+        return
+
     combined_detections = np.zeros((detections.shape[1], detections.shape[2], 3), dtype=np.uint8)
     for i in range(num_detections):
         #combined_detections[detections[i] > 0] = colors[i]  # Use same color for corresponding object

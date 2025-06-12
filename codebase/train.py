@@ -13,7 +13,7 @@ if __name__ == "__main__":
     print(torch.version.cuda)
     print("torch version:", torch.__version__)
 
-    data = "dsb" # aureus  dsb  mixed  breast subtilis neurips
+    data = "neurips" # aureus  dsb  mixed  breast subtilis neurips
     mode = "train"
     images_path, masks_path = get_dataset_path(data, mode)
     dataset = create_dataset(images_path, masks_path, preprocess=True, axis_norm=(0, 1))
@@ -27,7 +27,7 @@ if __name__ == "__main__":
     processor = SamProcessor.from_pretrained("facebook/sam-vit-base")
     train_dataset = SegDataset(dataset=dataset, processor=processor)
     train_data = DataLoader(train_dataset, batch_size=2, shuffle=True, collate_fn=custom_collate_fn)
-    # plot_imgs(train_data)
+    plot_imgs(train_data)
 
 
     model_type = "sam"  # or "unet", "stardist" "sam"

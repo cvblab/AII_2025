@@ -29,8 +29,13 @@ def predict_masks(DEVICE, model, model_processor, image, bboxes, test=False):
         pred_mask = outputs["pred_masks"].squeeze()
         result_masks.append(pred_mask)
 
-    result_masks = torch.stack(result_masks)[:, 0, :, :].float()
-    return result_masks
+    if len(result_masks) == 0:
+        print("[WARNING] No predicted masks generated.")
+        return torch.empty(0)  # or torch.zeros([1, H, W]) if you need a placeholder
+
+    else:
+        result_masks = torch.stack(result_masks)[:, 0, :, :].float()
+        return result_masks
 
 
 def train_sam(DEVICE, train_data, num_epochs, threshold, backbone, output_path):
@@ -133,7 +138,12 @@ def test_sam(DEVICE, test_data, sam_model_path, semantic_seg_model_path, yolo_pa
     all_aps_per_threshold = {threshold: [] for threshold in tp_thresholds}
 
     for index, test_sample in enumerate(test_data):
-        gt_bboxes = test_sample["bounding_boxes"].squeeze(0)
+        if test_sample["bounding_boxes"] is None:
+            print(f"[WARNING] No bounding boxes for sample: {test_sample['image_path']}")
+            continue  # or handle accordingly
+        else:
+            gt_bboxes = test_sample["bounding_boxes"].squeeze(0)
+        #gt_bboxes = test_sample["bounding_boxes"].squeeze(0)
         gt_masks = test_sample['instance_gt_masks'].squeeze(0).float().to(DEVICE)
 
         if semantic==True:
