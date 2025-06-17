@@ -7,42 +7,65 @@ from torch.utils.data import Dataset as TorchDataset
 from torchvision.transforms import CenterCrop
 import torch
 from .preprocess import get_bounding_boxes, preprocess_data
-import cv2
 import os
-import imageio.v2 as imageio  # imageio.v2 avoids deprecation warnings
-from csbdeep.utils import normalize
-#from Stardist.stardist import fill_label_holes
-from codebase.Stardist.stardist import fill_label_holes
-from tqdm import tqdm
+import imageio.v2 as imageio
 import matplotlib.pyplot as plt
 
 def get_dataset_path(data, mode):
+    if os.path.exists("/workspace/cell_segmentation/datasets"):
+        # Running inside Docker
+        base_dataset_path = "/workspace/cell_segmentation/datasets"
+    else:
+        # Running locally (venv)
+        base_dataset_path = "../datasets"
 
     if data == "dsb":
-        images_path = f"../datasets/dsb2018/{mode}/images/*.tif"
-        masks_path = f"../datasets/dsb2018/{mode}/masks/*.tif"
+        images_path = os.path.join(base_dataset_path, f"dsb2018/{mode}/images/*.tif")
+        masks_path = os.path.join(base_dataset_path, f"dsb2018/{mode}/masks/*.tif")
 
     elif data == "aureus":
-        images_path = f"../datasets/aureus/{mode}/fluorescence/*.tif"
-        masks_path = f"../datasets/aureus/{mode}/masks/*.tif"
+        images_path = os.path.join(base_dataset_path, f"aureus/{mode}/fluorescence/*.tif")
+        masks_path = os.path.join(base_dataset_path, f"aureus/{mode}/masks/*.tif")
 
     elif data == "mixed":
-        images_path = f"../datasets/mixed_dataset/{mode}/source/*.tif"
-        masks_path = f"../datasets/mixed_dataset/{mode}/target/*.tif"
+        images_path = os.path.join(base_dataset_path, f"mixed_dataset/{mode}/source/*.tif")
+        masks_path = os.path.join(base_dataset_path, f"mixed_dataset/{mode}/target/*.tif")
 
     elif data == "breast":
-        images_path = f"../datasets/breast_cancer/{mode}/images/*.tif"
-        masks_path = f"../datasets/breast_cancer/{mode}/masks/*.tif"
+        images_path = os.path.join(base_dataset_path, f"breast_cancer/{mode}/images/*.tif")
+        masks_path = os.path.join(base_dataset_path, f"breast_cancer/{mode}/masks/*.tif")
 
     elif data == "subtilis":
-        images_path = f"../datasets/subtilis/{mode}/fluorescence/*.png"
-        masks_path = f"../datasets/subtilis/{mode}/masks/*.png"
+        images_path = os.path.join(base_dataset_path, f"subtilis/{mode}/fluorescence/*.png")
+        masks_path = os.path.join(base_dataset_path, f"subtilis/{mode}/masks/*.png")
 
     elif data == "neurips":
-        images_path = f"../datasets/neurips/{mode}/images/*"
-        masks_path = f"../datasets/neurips/{mode}/labels/*"
+        images_path = os.path.join(base_dataset_path, f"neurips/{mode}/images/*")
+        masks_path = os.path.join(base_dataset_path, f"neurips/{mode}/labels/*")
+
+    else:
+        raise ValueError(f"Unknown dataset: {data}")
 
     return images_path, masks_path
+
+
+def get_model_paths(data):
+    if os.path.exists("/workspace/cell_segmentation/datasets"):
+        # Running inside Docker
+        base_logs_path = "/workspace/cell_segmentation/logs"
+        base_models_path = "/workspace/cell_segmentation/codebase"
+    else:
+        # Running locally (venv)
+        base_logs_path = "../logs"
+        base_models_path = "../codebase"
+
+    instance_seg_model_path = os.path.join(base_logs_path, "training", "sam_old", "sam_model_dsb_best.pth")
+    semantic_seg_model_path = os.path.join(base_logs_path, "training", "semantic2", data, "best_unet.pth")
+    yolo_path = os.path.join(base_logs_path, "training", "yolo", f"yolov8_{data}", "weights", "best.pt")
+    cellpose_path = os.path.join(base_models_path, "models", "cellpose", f"cellpose_{data}")
+
+    return instance_seg_model_path, semantic_seg_model_path, yolo_path, cellpose_path
+
 
 def plot_images_and_masks(images, masks, max_samples=10):
     n = min(len(images), len(masks), max_samples)

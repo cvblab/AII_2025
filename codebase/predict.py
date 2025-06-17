@@ -1,20 +1,24 @@
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import torch
 from torch.utils.data import DataLoader
 from transformers import SamProcessor
-from codebase.data.dataset import SegDataset, create_dataset, custom_collate_fn, get_dataset_path
+from data.dataset import SegDataset, create_dataset, custom_collate_fn, get_dataset_path, get_model_paths
 import numpy as np
-from codebase.models.sam import test_sam
-from codebase.models.stardist import test_stardist
-from codebase.models.unet import test_unet
-from codebase.models.unet_semantic_segmentation import test_semantic_segmentation
-from codebase.models.cellpose_model import test_cellpose
+from models.sam import test_sam
+from models.stardist import test_stardist
+from models.unet import test_unet
+from models.unet_semantic_segmentation import test_semantic_segmentation
+from models.cellpose_model import test_cellpose
 
 
 if __name__ == "__main__":
+
     print(torch.version.cuda)
     print("torch version:", torch.__version__)
 
-    data = "neurips"  # aureus  dsb  mixed  breast subtilis neurips
+    data = "aureus"  # aureus  dsb  mixed  breast subtilis neurips
     mode = "test"
     images_path, masks_path = get_dataset_path(data, mode)
     dataset = create_dataset(images_path, masks_path, preprocess=True, axis_norm=(0, 1))
@@ -33,11 +37,8 @@ if __name__ == "__main__":
     threshold = 0.7
     nms_iou_threshold = 0.5
     tp_thresholds = [round(th, 2) for th in np.arange(0.5, 1.0, 0.05)]
-    instance_seg_model_path = "../logs/training/sam_old/sam_model_dsb_best.pth"
-    semantic_seg_model_path = f"../logs/training/semantic2/{data}/unet_final_epoch45.pth"
-    yolo_path = f"../logs/training/yolo/yolov8_{data}/weights/best.pt"
-    yolo_path = f"../logs/training/yolo/yolov8_dsb/weights/best.pt"
-    cellpose_path = f"models/cellpose/cellpose_{data}"
+    instance_seg_model_path, semantic_seg_model_path, yolo_path, cellpose_path = get_model_paths(data)
+    print(instance_seg_model_path)
 
     if model_type == "sam":
         test_sam(DEVICE, test_data, instance_seg_model_path, semantic_seg_model_path, yolo_path, tp_thresholds, nms_iou_threshold, backbone="base", semantic=semantic)

@@ -1,19 +1,12 @@
-import glob
-import tifffile
 import numpy as np
 from PIL import Image
 from datasets import Dataset
-from torch.utils.data import Dataset as TorchDataset
-from torchvision.transforms import CenterCrop
 import torch
 import cv2
 import os
 from csbdeep.utils import normalize
-#from Stardist.stardist import fill_label_holes
 from codebase.Stardist.stardist import fill_label_holes
 from tqdm import tqdm
-import matplotlib.pyplot as plt
-
 
 
 def preprocess_data(images, masks, axis_norm=(0, 1)):
@@ -98,6 +91,7 @@ def augmenter(x, y):
     sig = 0.02 * np.random.uniform(0, 1)
     x = x + sig * np.random.normal(0, 1, x.shape)
     return x, y
+
 
 def get_bounding_boxes(instance_mask):
     # Find contours of the instance mask

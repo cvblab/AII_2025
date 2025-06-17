@@ -1,7 +1,5 @@
-import numpy as np
 from cellpose import models, core, io, plot, train, metrics
 from pathlib import Path
-import matplotlib.pyplot as plt
 import shutil
 import torch
 from PIL import Image

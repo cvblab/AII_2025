@@ -8,12 +8,14 @@ from models.stardist import train_stardist
 from models.unet_semantic_segmentation import train_semantic_seg
 from models.cellpose_model import train_cellpose
 from codebase.utils.visualize import plot_imgs
+import os
 
 if __name__ == "__main__":
+    print(os.getcwd())
     print(torch.version.cuda)
     print("torch version:", torch.__version__)
 
-    data = "neurips" # aureus  dsb  mixed  breast subtilis neurips
+    data = "aureus" # aureus  dsb  mixed  breast subtilis neurips
     mode = "train"
     images_path, masks_path = get_dataset_path(data, mode)
     dataset = create_dataset(images_path, masks_path, preprocess=True, axis_norm=(0, 1))
@@ -33,6 +35,15 @@ if __name__ == "__main__":
     model_type = "sam"  # or "unet", "stardist" "sam"
     num_epochs = 50
     threshold = 0.5
+
+    if os.path.exists("/workspace/cell_segmentation/datasets"):
+        # Running inside Docker
+        base_output_path = "/workspace/cell_segmentation/logs"
+    else:
+        # Running locally (venv)
+        base_output_path = "../logs"
+    instance_seg_model_path = os.path.join(base_output_path, "training", model_type, data)
+    semantic_seg_model_path = os.path.join(base_output_path, "training", model_type, data)
     output_path = "../logs/training/" + model_type + "/" + data
 
     if model_type == "sam": # base large huge

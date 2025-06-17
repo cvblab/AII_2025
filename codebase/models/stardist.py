@@ -6,12 +6,12 @@ from glob import glob
 from tqdm import tqdm
 from tifffile import imread
 from csbdeep.utils import Path, normalize
-from stardist import fill_label_holes, random_label_cmap, calculate_extents, gputools_available
-from stardist.models import Config2D, StarDist2D
-from stardist import random_label_cmap, _draw_polygons
+from codebase.Stardist.stardist import fill_label_holes, random_label_cmap, calculate_extents, gputools_available
+from codebase.Stardist.stardist.models import Config2D, StarDist2D
+from codebase.Stardist.stardist import random_label_cmap, _draw_polygons
 from codebase.utils.metrics import calculate_metrics,  average_precision
 from codebase.utils.visualize import plot_ap,plot_instance_segmentation,plot_loss
-from stardist.matching import matching_dataset
+from  codebase.Stardist.stardist.matching import matching_dataset
 import pandas as pd
 
 lbl_cmap = random_label_cmap()
