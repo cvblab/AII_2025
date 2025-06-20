@@ -17,6 +17,7 @@ if not core.use_gpu():
 
 
 def prepare_cellpose_folder(data, target_dir, mask_suffix="_mask"):
+
     target_dir = Path(target_dir)
     target_dir.mkdir(parents=True, exist_ok=True)
 
@@ -28,21 +29,21 @@ def prepare_cellpose_folder(data, target_dir, mask_suffix="_mask"):
         for item_index in range(len(batch["image"])):
             image = batch['image'][item_index]
             mask = batch['original_gt_masks'][item_index]
-            img_name = str(batch['path'][item_index]).split("\\")[-1]
+            img_name_raw = Path(batch['path'][item_index]).name
+            img_name = img_name_raw.replace("_mask", "")
+            img_stem = Path(img_name).stem
 
             # Convert image to PIL and save
             if isinstance(image, torch.Tensor):
-                # convert tensor (C,H,W) or (H,W,C) to numpy
                 img_np = image.cpu().numpy()
-                if img_np.shape[0] == 3 and img_np.shape[1] == 256:  # probably (C,H,W)
+                if img_np.shape[0] == 3 and img_np.shape[1] == 256:
                     img_np = np.transpose(img_np, (1, 2, 0))
             else:
                 img_np = np.array(image)
 
-
             img = (img_np * 255).clip(0, 255).astype(np.uint8)
             img_pil = Image.fromarray(img, mode='RGB')
-            img_pil.save(target_dir / img_name)
+            img_pil.save(target_dir / f"{img_stem}.tif")
 
             # Convert mask tensor to PIL and save
             if isinstance(mask, torch.Tensor):
@@ -51,25 +52,33 @@ def prepare_cellpose_folder(data, target_dir, mask_suffix="_mask"):
                 mask_np = np.array(mask)
 
             mask_pil = Image.fromarray(mask_np.astype(np.uint8), mode="L")
-            mask_name = f"{Path(img_name).stem}{mask_suffix}{Path(img_name).suffix}"
+            mask_name = f"{img_stem}{mask_suffix}.tif"
             mask_pil.save(target_dir / mask_name)
 
     print(f"Saved images and masks in {target_dir}")
 
 
+
+
 # Train the model
-def train_cellpose(DEVICE, train_data, num_epochs, data,  model_name="cellpose_custom_model"):
+def train_cellpose(DEVICE, train_data, num_epochs, data):
+
     learning_rate = 1e-5
     weight_decay = 0.1
     batch_size = 2
-    model_name = f"cellpose/cellpose_{data}"
-    train_dir = Path("tmp/cellpose_train")
     masks_ext = "_mask"
-    prepare_cellpose_folder(train_data, train_dir, mask_suffix=masks_ext)
+
+    model_name = Path(f"/workspace/cell_segmentation/logs/training/cellpose/{data}")
+    model_name.mkdir(parents=True, exist_ok=True)
+    train_dir = Path(f"/workspace/cell_segmentation/datasets/cellpose_data/{data}/train")
+    # train_dir.mkdir(parents=True, exist_ok=True)
+    # prepare_cellpose_folder(train_data, train_dir, mask_suffix=masks_ext)
+
     output = io.load_train_test_data(str(train_dir),None,
                                      mask_filter=masks_ext)
     train_data, train_labels, _, test_data, test_labels, _ = output
     model = models.CellposeModel(gpu=True)
+
     new_model_path, train_losses, test_losses = train.train_seg(
         model.net,
         train_data=train_data,
@@ -82,12 +91,11 @@ def train_cellpose(DEVICE, train_data, num_epochs, data,  model_name="cellpose_c
         model_name=model_name
     )
 
-    shutil.rmtree(train_dir, ignore_errors=True)
-
 
 # Evaluate on test data (optional)
-def test_cellpose(DEVICE, test_data, tp_thresholds, model_path):
-    test_dir = Path("tmp/cellpose_test")
+def test_cellpose(DEVICE, test_data, tp_thresholds, model_path, data):
+    test_dir = Path(f"/workspace/cell_segmentation/datasets/cellpose_data/{data}/test")
+    test_dir.mkdir(parents=True, exist_ok=True)
     masks_ext = "_mask"
     prepare_cellpose_folder(test_data, test_dir, mask_suffix=masks_ext)
     output = io.load_train_test_data(str(test_dir), None,

@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import torch
 from tqdm import tqdm
 
+
 def plot_bboxes_nms(ax, image, bboxes):
     ax.imshow(image, cmap="gray")  # Assuming a grayscale image
     for box in bboxes:
@@ -17,6 +18,7 @@ def plot_bboxes_nms(ax, image, bboxes):
         )
         ax.add_patch(rect)
     ax.axis("off")
+
 
 def plot_nms(image, gt_boxes, original_bboxes, filtered_bboxes, iou_threshold):
     """
@@ -56,6 +58,7 @@ def plot_instance_segmentation(detections, ground_truth, image, bounding_boxes, 
         detections = np.expand_dims(detections, axis=0)
 
     print("ground_truth shape:", ground_truth.shape)
+    print("detections shape:", detections.shape)
     num_objects = ground_truth.shape[0]  # Number of objects
     num_detections = detections.shape[0]  # Number of detected objects
 
@@ -116,7 +119,6 @@ def plot_instance_segmentation(detections, ground_truth, image, bounding_boxes, 
 
     combined_detections = np.zeros((detections.shape[1], detections.shape[2], 3), dtype=np.uint8)
     for i in range(num_detections):
-        #combined_detections[detections[i] > 0] = colors[i]  # Use same color for corresponding object
         mask = detections[i, :, :] > 0  # Assumes the mask is in the first channel for each object
         combined_detections[mask] = colors[i % len(colors)]
 
@@ -170,7 +172,6 @@ def plot_instance_segmentation(detections, ground_truth, image, bounding_boxes, 
 
         plt.savefig(output_path, dpi=300)
 
-    # else:
     plt.show()
 
 
@@ -206,7 +207,6 @@ def plot_semantic_segmentation(pred_mask, gt_mask, input_tensor):
 
     plt.tight_layout()
     plt.show()
-
 
 
 def visualize_single_cells(input_tensor, gt_masks, preds, binary_preds):

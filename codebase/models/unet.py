@@ -190,7 +190,10 @@ def train_unet(DEVICE, train_data, num_epochs, threshold, output_path):
         plot_loss(losses_list, epoch, output_path)
         plot_ap(average_precisions_list, epoch, output_path)
 
+
+
 def test_unet(DEVICE, test_data, unet_model_path, semantic_seg_model_path, yolo_path, tp_thresholds, nms_iou_threshold, semantic=False):
+
     model, model_processor, optimizer, bce_loss_fn, seg_loss = get_unet(DEVICE)
     print("Testing U-Net")
 

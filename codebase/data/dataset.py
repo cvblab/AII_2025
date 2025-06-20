@@ -11,6 +11,8 @@ import os
 import imageio.v2 as imageio
 import matplotlib.pyplot as plt
 
+
+
 def get_dataset_path(data, mode):
     if os.path.exists("/workspace/cell_segmentation/datasets"):
         # Running inside Docker
@@ -49,6 +51,7 @@ def get_dataset_path(data, mode):
     return images_path, masks_path
 
 
+
 def get_model_paths(data):
     if os.path.exists("/workspace/cell_segmentation/datasets"):
         # Running inside Docker
@@ -65,6 +68,7 @@ def get_model_paths(data):
     cellpose_path = os.path.join(base_models_path, "models", "cellpose", f"cellpose_{data}")
 
     return instance_seg_model_path, semantic_seg_model_path, yolo_path, cellpose_path
+
 
 
 def plot_images_and_masks(images, masks, max_samples=10):
@@ -102,6 +106,8 @@ def plot_images_and_masks(images, masks, max_samples=10):
     plt.tight_layout()
     plt.show()
 
+
+
 def normalize_image(img):
     img = img.astype(np.float32)
     min_val, max_val = img.min(), img.max()
@@ -111,6 +117,8 @@ def normalize_image(img):
     else:
         return (img - min_val) / denom
 
+
+
 def create_dataset(images_path, masks_path, preprocess=True, axis_norm=(0, 1)):
     images, masks, paths = load_data(images_path, masks_path)
     images = [normalize_image(img) for img in images]
@@ -119,18 +127,7 @@ def create_dataset(images_path, masks_path, preprocess=True, axis_norm=(0, 1)):
         images, masks = preprocess_data(images, masks, axis_norm)
 
     plot_images_and_masks(images, masks)
-    # Create a dictionary with images and masks as PIL images
-    # dataset_dict = {
-    #     "image": [Image.fromarray(img) for img in images],
-    #     "label": [Image.fromarray(mask) for mask in masks],
-    #     "path": paths,
-    # }
 
-    # dataset_dict = {
-    #     "image": [Image.fromarray(np.uint8(img)) for img in images],
-    #     "label": [Image.fromarray(np.uint8(mask)) for mask in masks],
-    #     "path": paths,
-    # }
     dataset_dict = {
         "image": [Image.fromarray((img * 255).astype(np.uint8)) for img in images],
         "label": [Image.fromarray(np.uint8(mask)) for mask in masks],
@@ -141,6 +138,7 @@ def create_dataset(images_path, masks_path, preprocess=True, axis_norm=(0, 1)):
     dataset = Dataset.from_dict(dataset_dict)
 
     return dataset
+
 
 
 def read_image(path):
@@ -158,6 +156,7 @@ def read_image(path):
         img = np.dot(img[..., :3], [0.2989, 0.5870, 0.1140])
 
     return img.astype(np.float32)
+
 
 
 def load_data(images_path, masks_path):
@@ -181,6 +180,7 @@ def load_data(images_path, masks_path):
             filtered_mask_files.append(path)
 
     return filtered_images, filtered_masks, filtered_image_files
+
 
 
 class SegDataset(TorchDataset):
@@ -253,7 +253,7 @@ class SegDataset(TorchDataset):
             return None
 
         return {
-            "image_norm": torch.tensor(image),  # float32 [0,1]
+            "image_float": torch.tensor(image),  # float32 [0,1]
             "image_uint8": torch.tensor((image * 255).astype(np.uint8)),  # uint8 image
             "original_mask": torch.tensor(mask, dtype=torch.float32),
             "single_instance_masks": torch.tensor(instance_masks, dtype=torch.float32),
@@ -263,6 +263,7 @@ class SegDataset(TorchDataset):
         }
 
 
+
 def custom_collate_fn(batch):
     # Remove None entries
     batch = [item for item in batch if item is not None]
@@ -270,8 +271,8 @@ def custom_collate_fn(batch):
         return None
 
     # Stack fixed-size tensors
-    images = torch.stack([item['image_norm'] for item in batch])
-    images_original = torch.stack([item['image_uint8'] for item in batch])
+    images_float = torch.stack([item['image_float'] for item in batch])
+    images_uint8 = torch.stack([item['image_uint8'] for item in batch])
     pixel_values = torch.stack([item['pixel_values'] for item in batch])
     original_masks = torch.stack([item['original_mask'] for item in batch])
     paths = [item['path'] for item in batch]
@@ -306,8 +307,8 @@ def custom_collate_fn(batch):
 
     return {
         'pixel_values': pixel_values,
-        'image': images,
-        'original_image': images_original,
+        'image': images_float,
+        'image_uint8': images_uint8,
         'original_gt_masks': original_masks,
         'bounding_boxes': padded_boxes,
         'instance_gt_masks': padded_masks,

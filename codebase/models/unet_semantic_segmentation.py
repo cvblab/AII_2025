@@ -9,11 +9,14 @@ from tqdm import tqdm
 import os
 import pandas as pd
 
+
 # Combined loss function
 def combined_loss(pred, target, alpha=0.3):
     dice_loss = DiceLoss(mode='binary')
     bce_loss = nn.BCEWithLogitsLoss()
     return alpha * bce_loss(pred, target) + (1 - alpha) * dice_loss(pred, target)
+
+
 
 def train_semantic_seg(DEVICE, train_data, num_epochs, output_path, patience=5, min_delta=1e-4, f1_threshold=0.90):
     print("Training U-net for semantic segmentation")
@@ -40,8 +43,8 @@ def train_semantic_seg(DEVICE, train_data, num_epochs, output_path, patience=5, 
         total_loss = 0
         dice_scores = []
         total_TP, total_FP, total_FN, total_dice_score = 0, 0, 0, 0
-
         print(f"\nEpoch {epoch + 1}/{num_epochs}")
+
         for batch_index, batch in enumerate(tqdm(train_data, desc="Training")):
             if batch is None or len(batch["image"]) == 0:
                 print(f"Skipping empty batch {batch_index}.")
@@ -102,6 +105,7 @@ def train_semantic_seg(DEVICE, train_data, num_epochs, output_path, patience=5, 
 
 
 def test_semantic_segmentation(DEVICE, test_data, model_path):
+
     model = smp.Unet(
         encoder_name="resnet34",
         encoder_weights=None,
@@ -165,6 +169,7 @@ def test_semantic_segmentation(DEVICE, test_data, model_path):
 
 
 def predict_binary_mask(DEVICE, image, original_gt_masks, model_path):
+
     model = smp.Unet(
         encoder_name="resnet34",
         encoder_weights=None,

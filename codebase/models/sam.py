@@ -11,7 +11,9 @@ import monai
 import sys
 import pandas as pd
 
+
 def predict_masks(DEVICE, model, model_processor, image, bboxes, test=False):
+
     result_masks = []
 
     for idx, box in enumerate(bboxes):
@@ -39,6 +41,7 @@ def predict_masks(DEVICE, model, model_processor, image, bboxes, test=False):
 
 
 def train_sam(DEVICE, train_data, num_epochs, threshold, backbone, output_path):
+
     model,model_processor, optimizer, bce_loss_fn, seg_loss = get_sam_model(DEVICE, backbone)
     print(f"Training SAM on {DEVICE}")
     last_model_path = f'{output_path}/weights/last.pth'
@@ -62,25 +65,24 @@ def train_sam(DEVICE, train_data, num_epochs, threshold, backbone, output_path):
                 continue
 
             for item_index in range(len(batch["image"])):
+
                 num_objects = batch['num_objects_per_image'][item_index]
-                img_name = str(batch['path'][item_index]).split("\\")[1]
+                img_path = batch['path'][item_index]
+                img_name = os.path.basename(img_path)
                 valid_bboxes = batch["bounding_boxes"][item_index][:num_objects]
                 valid_gt_masks = batch['instance_gt_masks'][item_index][:num_objects].float().to(DEVICE)
-
-
                 pred_masks = predict_masks(DEVICE, model, model_processor, batch["image"][item_index].to(DEVICE),
                                            valid_bboxes).to(DEVICE)
 
                 if pred_masks.shape[0] != valid_gt_masks.shape[0]:
                     pred_masks = pad_predictions(valid_gt_masks, pred_masks)
-                # loss = bce_loss_fn(pred_masks.float(), valid_gt_masks.float())
+
                 loss = seg_loss(pred_masks, valid_gt_masks)
                 batch_loss += loss
 
                 TP, FP, FN = calculate_metrics(pred_masks.detach().cpu().numpy(), valid_gt_masks.cpu().numpy(),
                                                threshold=threshold)
-                print(
-                    f"Batch {batch_index}, Item {item_index} Number of cells:{num_objects}, TP: {TP}, FP: {FP}, FN: {FN}")
+                print(f"Batch {batch_index}, Item {item_index} Number of cells:{num_objects}, TP: {TP}, FP: {FP}, FN: {FN}")
 
                 total_TP += TP
                 total_FP += FP
@@ -91,7 +93,7 @@ def train_sam(DEVICE, train_data, num_epochs, threshold, backbone, output_path):
                     plot_instance_segmentation(
                         detections=pred_masks.detach().cpu().numpy(),
                         ground_truth=valid_gt_masks.cpu().numpy(),
-                        image=batch["original_image"][item_index],
+                        image=batch["image"][item_index],
                         bounding_boxes=batch["bounding_boxes"][item_index],
                         threshold=threshold,
                         epoch=epoch,
@@ -110,8 +112,7 @@ def train_sam(DEVICE, train_data, num_epochs, threshold, backbone, output_path):
         AP = average_precision(total_TP, total_FP, total_FN)
         losses_list.append(total_loss)
         average_precisions_list.append(AP)
-        print(
-            f"Epoch {epoch + 1}/{num_epochs}, Loss: {total_loss:.4f}, Epoch Losses: {epoch_losses}, Average Precision: {AP:.4f}")
+        print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {total_loss:.4f}, Epoch Losses: {epoch_losses}, Average Precision: {AP:.4f}")
 
         # Save last model weights
         torch.save(model.state_dict(), last_model_path)
@@ -128,6 +129,7 @@ def train_sam(DEVICE, train_data, num_epochs, threshold, backbone, output_path):
 
 
 def test_sam(DEVICE, test_data, sam_model_path, semantic_seg_model_path, yolo_path, tp_thresholds, nms_iou_threshold, backbone, semantic=False):
+
     model, model_processor, optimizer, bce_loss_fn, seg_loss = get_sam_model(DEVICE, backbone)
     print("Testing SAM")
 
@@ -143,15 +145,17 @@ def test_sam(DEVICE, test_data, sam_model_path, semantic_seg_model_path, yolo_pa
             continue  # or handle accordingly
         else:
             gt_bboxes = test_sample["bounding_boxes"].squeeze(0)
-        #gt_bboxes = test_sample["bounding_boxes"].squeeze(0)
+
         gt_masks = test_sample['instance_gt_masks'].squeeze(0).float().to(DEVICE)
 
         if semantic==True:
+
             binary_prediction, gt_binary_mask = predict_binary_mask(DEVICE, test_sample["image"].squeeze(0), test_sample['original_gt_masks'].float(), semantic_seg_model_path)
             plot_semantic_segmentation(binary_prediction, gt_binary_mask, test_sample["image"].squeeze(0).permute(2, 0, 1).to(DEVICE))
             yolo_boxes, confs = get_yolo_bboxes(binary_prediction, yolo_path)
 
         else:
+
             yolo_boxes, confs = get_yolo_bboxes(test_sample["image"],yolo_path)
 
         keep_indices = nms(yolo_boxes, confs, iou_threshold=nms_iou_threshold)
@@ -162,8 +166,8 @@ def test_sam(DEVICE, test_data, sam_model_path, semantic_seg_model_path, yolo_pa
         pred_masks = predict_masks(DEVICE, model, model_processor, test_sample["image"].to(DEVICE), bboxes=yolo_boxes_nms, test=True).to(DEVICE)
 
         for threshold in tp_thresholds:
-            TP, FP, FN = calculate_metrics(pred_masks.detach().cpu().numpy(), gt_masks.cpu().numpy(),
-                                           threshold=threshold)
+
+            TP, FP, FN = calculate_metrics(pred_masks.detach().cpu().numpy(), gt_masks.cpu().numpy(), threshold=threshold)
             AP = average_precision(TP, FP, FN)
             all_aps_per_threshold[threshold].append(AP)  # Store AP for this threshold
             print(f"Sample {index}, IoU Threshold: {threshold}, AP: {AP}, TP: {TP}, FP: {FP}, FN: {FN}")
@@ -181,18 +185,18 @@ def test_sam(DEVICE, test_data, sam_model_path, semantic_seg_model_path, yolo_pa
         )
     # Compute mean AP across all samples for each threshold
     mean_aps = {threshold: np.mean(aps) for threshold, aps in all_aps_per_threshold.items()}
-
     mean_ap_df = pd.DataFrame(list(mean_aps.items()), columns=["IoU Threshold", "Mean AP"])
-
-    # Print the DataFrame
     print(mean_ap_df)
 
 
 def get_sam_model(DEVICE, backbone):
+
     model_path = "facebook/sam-vit-" + backbone
     model = SamModel.from_pretrained(model_path)
     model_processor = AutoProcessor.from_pretrained(model_path)
+
     for name, param in model.named_parameters():
+
         if name.startswith(("vision_encoder", "prompt_encoder","image_encoder")):
             param.requires_grad_(False)
 

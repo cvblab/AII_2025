@@ -12,8 +12,9 @@ import os
 
 if __name__ == "__main__":
     print(os.getcwd())
-    print(torch.version.cuda)
     print("torch version:", torch.__version__)
+    print(torch.cuda.is_available())  # True
+    print(torch.version.cuda)  # '12.5'
 
     data = "aureus" # aureus  dsb  mixed  breast subtilis neurips
     mode = "train"
@@ -29,12 +30,10 @@ if __name__ == "__main__":
     processor = SamProcessor.from_pretrained("facebook/sam-vit-base")
     train_dataset = SegDataset(dataset=dataset, processor=processor)
     train_data = DataLoader(train_dataset, batch_size=2, shuffle=True, collate_fn=custom_collate_fn)
-    plot_imgs(train_data)
-
-
-    model_type = "sam"  # or "unet", "stardist" "sam"
+    #plot_imgs(train_data)
+    model_type = "stardist"  # or "unet", "stardist" "sam"
     num_epochs = 50
-    threshold = 0.5
+    threshold = 0.7
 
     if os.path.exists("/workspace/cell_segmentation/datasets"):
         # Running inside Docker
@@ -42,9 +41,10 @@ if __name__ == "__main__":
     else:
         # Running locally (venv)
         base_output_path = "../logs"
+
     instance_seg_model_path = os.path.join(base_output_path, "training", model_type, data)
     semantic_seg_model_path = os.path.join(base_output_path, "training", model_type, data)
-    output_path = "../logs/training/" + model_type + "/" + data
+    output_path = os.path.join(base_output_path, "training", model_type, data)
 
     if model_type == "sam": # base large huge
         train_sam(DEVICE, train_data, num_epochs, threshold, backbone="base", output_path=output_path)
