@@ -140,9 +140,14 @@ def test_sam(DEVICE, test_data, sam_model_path, semantic_seg_model_path, yolo_pa
     all_aps_per_threshold = {threshold: [] for threshold in tp_thresholds}
 
     for index, test_sample in enumerate(test_data):
+        if test_sample is None or len(test_sample["image"]) == 0:
+            print(f"Skipping empty batch {index}.")
+            continue
+
         if test_sample["bounding_boxes"] is None:
             print(f"[WARNING] No bounding boxes for sample: {test_sample['image_path']}")
             continue  # or handle accordingly
+
         else:
             gt_bboxes = test_sample["bounding_boxes"].squeeze(0)
 

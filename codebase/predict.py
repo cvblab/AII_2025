@@ -11,6 +11,7 @@ from models.stardist import test_stardist
 from models.unet import test_unet
 from models.unet_semantic_segmentation import test_semantic_segmentation
 from models.cellpose_model import test_cellpose
+from models.run_cellsam_script import test_cellsam
 
 
 if __name__ == "__main__":
@@ -32,7 +33,7 @@ if __name__ == "__main__":
     test_dataset = SegDataset(dataset=dataset, processor=processor)
     test_data = DataLoader(test_dataset, batch_size=1, shuffle=True, collate_fn=custom_collate_fn)
 
-    model_type = "cellpose"  # or "unet", "stardist" "sam"
+    model_type = "cellsam"  # or "unet", "stardist" "sam"
     semantic = False
     threshold = 0.7
     nms_iou_threshold = 0.5
@@ -49,3 +50,5 @@ if __name__ == "__main__":
         test_semantic_segmentation(DEVICE, test_data, semantic_seg_model_path)
     elif model_type == "cellpose":
         test_cellpose(DEVICE, test_data, tp_thresholds, cellpose_path, data)
+    elif model_type == "cellsam":
+        test_cellsam(DEVICE, test_data, tp_thresholds, cellpose_path, data)

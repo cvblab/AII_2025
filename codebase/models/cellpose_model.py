@@ -128,6 +128,7 @@ def test_cellpose(DEVICE, test_data, tp_thresholds, model_path, data):
             detections=pred_instances[i],
             ground_truth=gt_instances[i],
             image=torch.from_numpy(test_images[i]),
+            #image=test_data["image"][i].squeeze(0),
             bounding_boxes=[],
             threshold=0.7,
             epoch=0,

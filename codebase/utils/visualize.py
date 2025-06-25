@@ -70,12 +70,17 @@ def plot_instance_segmentation(detections, ground_truth, image, bounding_boxes, 
 
     if isinstance(image, torch.Tensor):
         image = image.cpu().numpy()
+
     # Transpose image for correct display (if it's in CHW format)
     if image.ndim == 3 and image.shape[0] == 3:  # likely CHW format
         image = np.transpose(image, (1, 2, 0))
 
-    # Ensure float32 and scale correctly
-    image = image.astype(np.float32)             # NEW
+    # Normalize only if dtype is uint8 (i.e., values in 0–255)
+    if image.dtype == np.uint8:
+        image = image.astype(np.float32) / 255.0
+    else:
+        image = image.astype(np.float32)
+    # NEW
     image = np.clip(image, 0.0, 1.0)
 
     # Plot original image
