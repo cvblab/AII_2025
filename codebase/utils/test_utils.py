@@ -12,7 +12,7 @@ def nms(boxes, scores, iou_threshold=0.5):
 
     # Compute areas of bounding boxes
     areas = (x2 - x1) * (y2 - y1)
-    max_area = 16384
+    max_area = 10000
     valid_indices = torch.where(areas <= max_area)[0]
     boxes = boxes[valid_indices]
     scores = scores[valid_indices]

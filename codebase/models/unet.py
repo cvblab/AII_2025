@@ -20,6 +20,7 @@ from codebase.utils.test_utils import get_yolo_bboxes, nms, pad_predictions
 from torchvision.transforms.functional import rgb_to_grayscale
 import segmentation_models_pytorch as smp
 from tqdm import tqdm
+import tensorflow as tf
 
 
 def create_bbox_mask(image_shape, bbox):
@@ -38,19 +39,19 @@ def create_bbox_mask(image_shape, bbox):
 
 
 def get_unet(DEVICE):
-    model = smp.Segformer(
-        encoder_name="resnet34",  # choose encoder, e.g. mobilenet_v2 or efficientnet-b7
-        encoder_weights="imagenet",  # use `imagenet` pre-trained weights for encoder initialization
-        in_channels=2,  # model input channels (1 for gray-scale images, 3 for RGB, etc.)
-        classes=1,  # model output channels (number of classes in your dataset)
-    )
+    #model = smp.Segformer(
+        #encoder_name="resnet34",  # choose encoder, e.g. mobilenet_v2 or efficientnet-b7
+        #encoder_weights="imagenet",  # use `imagenet` pre-trained weights for encoder initialization
+        #in_channels=2,  # model input channels (1 for gray-scale images, 3 for RGB, etc.)
+        #classes=1,  # model output channels (number of classes in your dataset)
+    #)
 
-    # model = smp.Unet(
-    #     encoder_name="resnet34",  # choose encoder, e.g. mobilenet_v2 or efficientnet-b7
-    #     encoder_weights="imagenet",  # use `imagenet` pre-trained weights for encoder initialization
-    #     in_channels=2,  # model input channels (1 for gray-scale images, 3 for RGB, etc.)
-    #     classes=1,  # model output channels (number of classes in your dataset)
-    # )
+    model = smp.Unet(
+         encoder_name="resnet34",  # choose encoder, e.g. mobilenet_v2 or efficientnet-b7
+         encoder_weights="imagenet",  # use `imagenet` pre-trained weights for encoder initialization
+         in_channels=2,  # model input channels (1 for gray-scale images, 3 for RGB, etc.)
+         classes=1,  # model output channels (number of classes in your dataset)
+    )
     model.to(DEVICE)
     bce_loss_fn = nn.BCEWithLogitsLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
@@ -256,6 +257,74 @@ def test_unet(DEVICE, test_data, unet_model_path, semantic_seg_model_path, yolo_
 
         plot_instance_segmentation(
            detections=pred_masks.detach().cpu().numpy(),
+           ground_truth=gt_masks.cpu().numpy(),
+           image=test_sample["image"].squeeze(0),
+           bounding_boxes=yolo_boxes_nms.cpu().numpy(),
+           threshold=threshold,
+           epoch=0,
+           img_name="",
+           output_path = "",
+           mode = "test"
+        )
+    # Compute mean AP across all samples for each threshold
+    mean_aps = {threshold: np.mean(aps) for threshold, aps in all_aps_per_threshold.items()}
+
+    mean_ap_df = pd.DataFrame(list(mean_aps.items()), columns=["IoU Threshold", "Mean AP"])
+
+    # Print the DataFrame
+    print(mean_ap_df)
+
+
+def test_unet_tf(DEVICE, test_data, unet_model_path, semantic_seg_model_path, yolo_path, threshold, tp_thresholds, nms_iou_threshold, semantic=False):
+
+    segmentation_model =  tf.keras.models.load_model("../logs/training/unet/dsb/unet_instance_segmentation.keras", compile=False)
+    print("Testing U-Net")
+    all_aps_per_threshold = {threshold: [] for threshold in tp_thresholds}
+
+    for index, test_sample in enumerate(test_data):
+        gt_bboxes = test_sample["bounding_boxes"].squeeze(0)
+        gt_masks = test_sample['instance_gt_masks'].squeeze(0).float().to(DEVICE)
+
+        if semantic==True:
+            binary_prediction, gt_binary_mask = predict_binary_mask(DEVICE, test_sample["image"].squeeze(0), test_sample['original_gt_masks'].float(), semantic_seg_model_path)
+            plot_semantic_segmentation(binary_prediction, gt_binary_mask, test_sample["image"].squeeze(0).permute(2, 0, 1).to(DEVICE))
+            yolo_boxes, confs = get_yolo_bboxes(binary_prediction, yolo_path)
+
+        else:
+            yolo_boxes, confs = get_yolo_bboxes(test_sample["image"],yolo_path)
+
+        keep_indices = nms(yolo_boxes, confs, iou_threshold=nms_iou_threshold)
+        yolo_boxes_nms = yolo_boxes[keep_indices.long()]
+        print(f"Number of gt cells: {len(gt_bboxes)}")
+        print(f"Number of predicted cells: {len(yolo_boxes_nms)}")
+        calculate_bbox_accuracy(gt_bboxes, yolo_boxes_nms, iou_threshold=0.5)
+        img_and_bboxes = []
+
+        for bbox in yolo_boxes_nms:
+            bbox_mask = torch.tensor(create_bbox_mask(test_sample["image"].shape[1:3], bbox)).unsqueeze(0)
+            img_gray = rgb_to_grayscale(test_sample["image"][0].permute(2, 0, 1))  # [C=1, H, W]
+            img_plus_bbox = torch.cat([img_gray, bbox_mask], dim=0)  # [2, H, W]
+            np_array = img_plus_bbox.cpu().numpy()
+            # Convert NumPy array to TensorFlow tensor
+            tf_tensor = tf.convert_to_tensor(np_array, dtype=tf.float32)
+            img_and_bboxes.append(tf_tensor)
+
+        img_and_bboxes = tf.convert_to_tensor(img_and_bboxes, dtype=tf.float32)
+        img_and_bboxes = tf.transpose(img_and_bboxes, perm=[0, 2, 3, 1])  # -> (16, 256, 256, 2)
+
+        # Prediction
+        prediction = segmentation_model.predict(img_and_bboxes, verbose=0)
+        prediction = tf.squeeze(prediction, axis=-1)
+
+        for threshold_tp in tp_thresholds:
+            TP, FP, FN = calculate_metrics(prediction.numpy(), gt_masks.cpu().numpy(),
+                                           threshold=threshold_tp)
+            AP = average_precision(TP, FP, FN)
+            all_aps_per_threshold[threshold_tp].append(AP)  # Store AP for this threshold
+            print(f"Sample {index}, IoU Threshold: {threshold_tp}, AP: {AP}, TP: {TP}, FP: {FP}, FN: {FN}")
+
+        plot_instance_segmentation(
+           detections=prediction.numpy(),
            ground_truth=gt_masks.cpu().numpy(),
            image=test_sample["image"].squeeze(0),
            bounding_boxes=yolo_boxes_nms.cpu().numpy(),

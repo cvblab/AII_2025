@@ -65,6 +65,7 @@ def get_model_paths(data):
     instance_seg_model_path = os.path.join(base_logs_path, "training", "sam_old", "sam_model_dsb_best.pth")
     semantic_seg_model_path = os.path.join(base_logs_path, "training", "semantic2", data, "best_unet.pth")
     yolo_path = os.path.join(base_logs_path, "training", "yolo", f"yolov8_{data}", "weights", "best.pt")
+    #yolo_path = os.path.join(base_logs_path, "training", "yolo", f"yolov8_dsb", "weights", "best.pt")
     cellpose_path = os.path.join(base_models_path, "models", "cellpose", f"cellpose_{data}")
 
     return instance_seg_model_path, semantic_seg_model_path, yolo_path, cellpose_path
