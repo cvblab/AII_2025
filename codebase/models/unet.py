@@ -77,6 +77,7 @@ def train_unet(DEVICE, train_data, num_epochs, threshold, output_path):
         total_loss_epoch = 0
         epoch_losses = []
         total_TP, total_FP, total_FN = 0, 0, 0
+        best_batch_loss = float('inf')
 
         for batch_index, batch in enumerate(tqdm(train_data, desc=f"Epoch {epoch + 1}/{num_epochs}")):
             optimizer.zero_grad()
@@ -84,7 +85,6 @@ def train_unet(DEVICE, train_data, num_epochs, threshold, output_path):
 
             for item_index in range(len(batch["image"])):
                 num_objects = batch['num_objects_per_image'][item_index]
-                img_name = str(batch['path'][item_index]).split("\\")[-1]
                 valid_bboxes = batch["bounding_boxes"][item_index][:num_objects]
                 valid_gt_masks = batch['instance_gt_masks'][item_index][:num_objects].float().unsqueeze(-1).to(DEVICE)
                 img_and_bboxes = []
@@ -172,6 +172,15 @@ def train_unet(DEVICE, train_data, num_epochs, threshold, output_path):
             total_loss_epoch += batch_loss
             epoch_losses.append(batch_loss)
 
+            torch.save(model.state_dict(), last_model_path)
+            print(f"Last epoch weights saved at {last_model_path}")
+
+            if batch_loss < best_batch_loss:
+                best_batch_loss = batch_loss
+                torch.save(model.state_dict(), best_model_path)
+                print(
+                    f"Best model updated at batch {batch_index} with loss: {best_batch_loss:.4f}, saved at {best_model_path}")
+
         AP = average_precision(total_TP, total_FP, total_FN)
         print(
             f"Epoch {epoch + 1}/{num_epochs}, Loss: {total_loss_epoch:.4f}, Epoch Losses: {epoch_losses}, Average Precision: {AP:.4f}")
@@ -193,9 +202,9 @@ def train_unet(DEVICE, train_data, num_epochs, threshold, output_path):
 
 
 
-def test_unet(DEVICE, test_data, unet_model_path, semantic_seg_model_path, yolo_path, tp_thresholds, nms_iou_threshold, semantic=False):
+def test_unet(DEVICE, test_data, unet_model_path, semantic_seg_model_path, yolo_path, threshold, tp_thresholds, nms_iou_threshold, semantic=False):
 
-    model, model_processor, optimizer, bce_loss_fn, seg_loss = get_unet(DEVICE)
+    model, optimizer, bce_loss_fn = get_unet(DEVICE)
     print("Testing U-Net")
 
     state_dict = torch.load(unet_model_path, map_location="cuda" if torch.cuda.is_available() else "cpu")
@@ -226,12 +235,14 @@ def test_unet(DEVICE, test_data, unet_model_path, semantic_seg_model_path, yolo_
         pred_masks = []
 
         for bbox in yolo_boxes_nms:
-            bbox_mask = torch.tensor(create_bbox_mask(test_sample["image"][index].shape[:2], bbox)).unsqueeze(0)
-            img_gray = rgb_to_grayscale(test_sample["image"][index].permute(2, 0, 1))  # [C=1, H, W]
+            image = test_sample["image"].squeeze(0)
+            bbox_mask = torch.tensor(create_bbox_mask(image.shape[:2], bbox)).unsqueeze(0)
+            img_gray = rgb_to_grayscale(image.permute(2, 0, 1))  # [C=1, H, W]
             img_plus_bbox = torch.cat([img_gray, bbox_mask], dim=0)  # [2, H, W]
             img_and_bboxes.append(img_plus_bbox)
 
             # Iterate over sub-batches
+        img_and_bboxes = torch.stack(img_and_bboxes).to(DEVICE)
         for j in range(0, len(img_and_bboxes), sub_batch_size):
             input_sub_batch = img_and_bboxes[j:j + sub_batch_size]
             masks_sub_batch = gt_masks[j:j + sub_batch_size]
@@ -239,28 +250,31 @@ def test_unet(DEVICE, test_data, unet_model_path, semantic_seg_model_path, yolo_
             batched_cells_predictions = model(input_sub_batch.float())
             batched_cells_predictions = batched_cells_predictions.permute(0, 2, 3, 1)
 
+            probs = torch.sigmoid(batched_cells_predictions)
+            binary_preds = (probs > 0.98).float()
+            #visualize_single_cells(input_tensor=input_sub_batch, gt_masks=masks_sub_batch,
+                                   #preds=batched_cells_predictions, binary_preds=binary_preds)
+
             print("Pred min:", batched_cells_predictions.min(), "max:", batched_cells_predictions.max())
-            # probs = torch.sigmoid(batched_cells_predictions)
-
-            visualize_single_cells(input_tensor=input_sub_batch, gt_masks=masks_sub_batch,
-                                   preds=batched_cells_predictions)
-
             pred_masks.extend(batched_cells_predictions.detach().cpu())
 
         pred_masks = torch.stack(pred_masks)
+        probs = torch.sigmoid(pred_masks)
+        pred_masks = (probs > 0.98).float()
+
         for threshold in tp_thresholds:
-            TP, FP, FN = calculate_metrics(pred_masks.detach().cpu().numpy(), gt_masks.cpu().numpy(),
+            TP, FP, FN = calculate_metrics(pred_masks.squeeze(-1).detach().cpu().numpy(), gt_masks.cpu().numpy(),
                                            threshold=threshold)
             AP = average_precision(TP, FP, FN)
             all_aps_per_threshold[threshold].append(AP)  # Store AP for this threshold
             print(f"Sample {index}, IoU Threshold: {threshold}, AP: {AP}, TP: {TP}, FP: {FP}, FN: {FN}")
 
         plot_instance_segmentation(
-           detections=pred_masks.detach().cpu().numpy(),
+           detections=pred_masks.squeeze(-1).detach().cpu().numpy(),
            ground_truth=gt_masks.cpu().numpy(),
-           image=test_sample["image"].squeeze(0),
+           image=image,
            bounding_boxes=yolo_boxes_nms.cpu().numpy(),
-           threshold=threshold,
+           threshold=0.7,
            epoch=0,
            img_name="",
            output_path = "",

@@ -52,7 +52,7 @@ def get_dataset_path(data, mode):
 
 
 
-def get_model_paths(data):
+def get_model_paths(data, model_type):
     if os.path.exists("/workspace/cell_segmentation/datasets"):
         # Running inside Docker
         base_logs_path = "/workspace/cell_segmentation/logs"
@@ -62,10 +62,9 @@ def get_model_paths(data):
         base_logs_path = "../logs"
         base_models_path = "../codebase"
 
-    instance_seg_model_path = os.path.join(base_logs_path, "training", "sam_old", "sam_model_dsb_best.pth")
+    instance_seg_model_path = os.path.join(base_logs_path, "training", model_type, "dsb", "weights/last.pth")
     semantic_seg_model_path = os.path.join(base_logs_path, "training", "semantic2", data, "best_unet.pth")
     yolo_path = os.path.join(base_logs_path, "training", "yolo", f"yolov8_{data}", "weights", "best.pt")
-    #yolo_path = os.path.join(base_logs_path, "training", "yolo", f"yolov8_dsb", "weights", "best.pt")
     cellpose_path = os.path.join(base_models_path, "models", "cellpose", f"cellpose_{data}")
 
     return instance_seg_model_path, semantic_seg_model_path, yolo_path, cellpose_path

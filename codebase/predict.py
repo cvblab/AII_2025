@@ -8,7 +8,7 @@ from data.dataset import SegDataset, create_dataset, custom_collate_fn, get_data
 import numpy as np
 from models.sam import test_sam
 from models.stardist import test_stardist
-from models.unet import test_unet_tf
+from models.unet import test_unet_tf, test_unet
 from models.unet_semantic_segmentation import test_semantic_segmentation
 from models.cellpose_model import test_cellpose
 from models.run_cellsam import test_cellsam
@@ -19,7 +19,7 @@ if __name__ == "__main__":
     print(torch.version.cuda)
     print("torch version:", torch.__version__)
 
-    data = "dsb"  # aureus  dsb  mixed  breast subtilis neurips
+    data = "breast"  # aureus  dsb  mixed  breast subtilis neurips
     mode = "test"
     images_path, masks_path = get_dataset_path(data, mode)
     dataset = create_dataset(images_path, masks_path, preprocess=True, axis_norm=(0, 1))
@@ -33,17 +33,17 @@ if __name__ == "__main__":
     test_dataset = SegDataset(dataset=dataset, processor=processor)
     test_data = DataLoader(test_dataset, batch_size=1, shuffle=True, collate_fn=custom_collate_fn)
 
-    model_type = "unet"  # or "unet", "stardist" "sam"
+    model_type = "cellpose"  # or "unet", "stardist" "sam"
     semantic = False
     threshold = 0.7
     nms_iou_threshold = 0.5
     tp_thresholds = [round(th, 2) for th in np.arange(0.5, 1.0, 0.05)]
-    instance_seg_model_path, semantic_seg_model_path, yolo_path, cellpose_path = get_model_paths(data)
+    instance_seg_model_path, semantic_seg_model_path, yolo_path, cellpose_path = get_model_paths(data, model_type)
 
     if model_type == "sam":
         test_sam(DEVICE, test_data, instance_seg_model_path, semantic_seg_model_path, yolo_path, tp_thresholds, nms_iou_threshold, backbone="base", semantic=semantic)
     elif model_type == "unet":
-        test_unet_tf(DEVICE, test_data, instance_seg_model_path, semantic_seg_model_path, yolo_path, threshold, tp_thresholds, nms_iou_threshold, semantic=semantic)
+        test_unet(DEVICE, test_data, instance_seg_model_path, semantic_seg_model_path, yolo_path, threshold, tp_thresholds, nms_iou_threshold, semantic=semantic)
     elif model_type == "stardist":
         test_stardist(test_data,tp_thresholds)
     elif model_type == "semantic_segmentation":
