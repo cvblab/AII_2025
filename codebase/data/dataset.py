@@ -10,15 +10,16 @@ from .preprocess import get_bounding_boxes, preprocess_data
 import os
 import imageio.v2 as imageio
 import matplotlib.pyplot as plt
+import os
 
 
 
 def get_dataset_path(data, mode):
-    if os.path.exists("/workspace/cell_segmentation/datasets"):
-        # Running inside Docker
+    env = os.environ.get("ENV", "LOCAL").lower()
+
+    if env == "docker":
         base_dataset_path = "/workspace/cell_segmentation/datasets"
     else:
-        # Running locally (venv)
         base_dataset_path = "../datasets"
 
     if data == "dsb":
@@ -53,21 +54,21 @@ def get_dataset_path(data, mode):
 
 
 def get_model_paths(data, model_type):
-    if os.path.exists("/workspace/cell_segmentation/datasets"):
-        # Running inside Docker
+
+    env = os.environ.get("ENV", "LOCAL").lower()
+
+    if env == "docker":
         base_logs_path = "/workspace/cell_segmentation/logs"
-        base_models_path = "/workspace/cell_segmentation/codebase"
     else:
-        # Running locally (venv)
-        base_logs_path = "../logs"
-        base_models_path = "../codebase"
+        base_logs_path = "../logs" # Running locally (venv)
 
-    instance_seg_model_path = os.path.join(base_logs_path, "training", model_type, "dsb", "weights/last.pth")
+    instance_seg_model_path = os.path.join(base_logs_path, "training", model_type, "dsb", "best.h5")
     semantic_seg_model_path = os.path.join(base_logs_path, "training", "semantic2", data, "best_unet.pth")
-    yolo_path = os.path.join(base_logs_path, "training", "yolo", f"yolov8_{data}", "weights", "best.pt")
-    cellpose_path = os.path.join(base_models_path, "models", "cellpose", f"cellpose_{data}")
+    yolo_path = os.path.join(base_logs_path, "training", "yolo", f"yolov8_dsb", "weights", "best.pt")
+    cellpose_path = os.path.join(base_logs_path, "training", "cellpose", "dsb", "last.pt")
+    stardist_path = os.path.join(base_logs_path, "training", "stardist")
 
-    return instance_seg_model_path, semantic_seg_model_path, yolo_path, cellpose_path
+    return instance_seg_model_path, semantic_seg_model_path, yolo_path, cellpose_path, stardist_path
 
 
 

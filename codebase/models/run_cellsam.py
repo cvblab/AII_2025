@@ -6,7 +6,7 @@ from codebase.utils.visualize import plot_instance_segmentation
 import pandas as pd
 
 
-def test_cellsam(DEVICE, test_data, tp_thresholds, cellpose_path, data):
+def test_cellsam(DEVICE, test_data, tp_thresholds):
 
     all_aps_per_threshold = {threshold: [] for threshold in tp_thresholds}
     # Inference loop

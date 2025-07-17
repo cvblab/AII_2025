@@ -31,20 +31,20 @@ if __name__ == "__main__":
     train_dataset = SegDataset(dataset=dataset, processor=processor)
     train_data = DataLoader(train_dataset, batch_size=2, shuffle=True, collate_fn=custom_collate_fn)
     #plot_imgs(train_data)
-    model_type = "unet"  # or "unet", "stardist" "sam"
+    model_type = "stardist"  # or "unet", "stardist" "sam"
     num_epochs = 50
     threshold = 0.7
+    env = os.environ.get("ENV", "LOCAL").lower()
 
-    if os.path.exists("/workspace/cell_segmentation/datasets"):
-        # Running inside Docker
+    if env == "docker":
         base_output_path = "/workspace/cell_segmentation/logs"
     else:
-        # Running locally (venv)
         base_output_path = "../logs"
 
     instance_seg_model_path = os.path.join(base_output_path, "training", model_type, data)
     semantic_seg_model_path = os.path.join(base_output_path, "training", model_type, data)
     output_path = os.path.join(base_output_path, "training", model_type, data)
+    os.makedirs(output_path, exist_ok=True)
 
     if model_type == "sam": # base large huge
         train_sam(DEVICE, train_data, num_epochs, threshold, backbone="base", output_path=output_path)
@@ -55,4 +55,4 @@ if __name__ == "__main__":
     elif model_type == "semantic":
         train_semantic_seg(DEVICE, train_data, num_epochs, output_path=output_path)
     elif model_type == "cellpose":
-        train_cellpose(DEVICE, train_data, num_epochs, data)
+        train_cellpose(num_epochs, data)

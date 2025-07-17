@@ -64,14 +64,15 @@ def train_stardist(DEVICE, train_data, num_epochs, threshold, output_path):
         n_channel_in=1,
     )
 
-    model = StarDist2D(conf, name="stardist",basedir=output_path)
-    model.train(X_trn, Y_trn, validation_data=(X_val, Y_val), epochs=200, steps_per_epoch=24)
+    model = StarDist2D(conf, name="last",basedir=output_path)
+    model.train(X_trn, Y_trn, validation_data=(X_val, Y_val), epochs=num_epochs, steps_per_epoch=24)
 
     return model
 
-def test_stardist(test_data, tp_thresholds):
-    model = StarDist2D(None, name="stardist_fluorescence", basedir="../weights/")
+def test_stardist(test_data, data, stardist_path, tp_thresholds):
+    #model = StarDist2D(None, name="stardist_fluorescence", basedir="../weights/")
     #model = StarDist2D.from_pretrained('2D_paper_dsb2018')
+    model = StarDist2D(None, name=data, basedir=stardist_path)
     all_aps_per_threshold = {threshold: [] for threshold in tp_thresholds}
 
     for index, test_sample in enumerate(test_data):
