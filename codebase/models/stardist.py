@@ -76,6 +76,9 @@ def test_stardist(test_data, data, stardist_path, tp_thresholds):
     all_aps_per_threshold = {threshold: [] for threshold in tp_thresholds}
 
     for index, test_sample in enumerate(test_data):
+        if test_sample is None:
+            print("Warning: No image in test sample — skipping")
+            continue
         img = test_sample["image"].squeeze()
         grayscale_image = img.permute(2, 0, 1).float().mean(dim=0)
         axis_norm = (0, 1)  # normalize channels independently
@@ -94,16 +97,22 @@ def test_stardist(test_data, data, stardist_path, tp_thresholds):
         # Create a consistent colormap
         cmap = plt.get_cmap('nipy_spectral', num_labels)
 
-        # Plot side-by-side comparison with shared colormap
-        fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+        fig, axes = plt.subplots(1, 3, figsize=(18, 6))
 
-        im0 = axes[0].imshow(gt_mask, cmap=cmap, vmin=0, vmax=num_labels - 1)
-        axes[0].set_title('Ground Truth Mask')
+        # Panel 1: Original grayscale image
+        axes[0].imshow(image, cmap='gray')
+        axes[0].set_title('Original Image')
         axes[0].axis('off')
 
-        im1 = axes[1].imshow(labels, cmap=cmap, vmin=0, vmax=num_labels - 1)
-        axes[1].set_title('Predicted Labels')
+        # Panel 2: Ground Truth
+        im0 = axes[1].imshow(gt_mask, cmap=cmap, vmin=0, vmax=num_labels - 1)
+        axes[1].set_title('Ground Truth Mask')
         axes[1].axis('off')
+
+        # Panel 3: Predicted Labels
+        im1 = axes[2].imshow(labels, cmap=cmap, vmin=0, vmax=num_labels - 1)
+        axes[2].set_title('Predicted Labels')
+        axes[2].axis('off')
 
         plt.tight_layout()
         plt.show()

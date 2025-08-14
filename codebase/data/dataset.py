@@ -46,6 +46,18 @@ def get_dataset_path(data, mode):
         images_path = os.path.join(base_dataset_path, f"neurips/{mode}/images/*")
         masks_path = os.path.join(base_dataset_path, f"neurips/{mode}/labels/*")
 
+    elif data == "tcell":
+        images_path = os.path.join(base_dataset_path, f"tcell/{mode}/images/*")
+        masks_path = os.path.join(base_dataset_path, f"tcell/{mode}/masks/*")
+
+    elif data == "flow_chamber":
+        images_path = os.path.join(base_dataset_path, f"flow_chamber/{mode}/images/*")
+        masks_path = os.path.join(base_dataset_path, f"flow_chamber/{mode}/masks/*")
+
+    elif data == "combined":
+        images_path = os.path.join(base_dataset_path, f"combined/images/*")
+        masks_path = os.path.join(base_dataset_path, f"combined/masks/*")
+
     else:
         raise ValueError(f"Unknown dataset: {data}")
 
@@ -62,10 +74,10 @@ def get_model_paths(data, model_type):
     else:
         base_logs_path = "../logs" # Running locally (venv)
 
-    instance_seg_model_path = os.path.join(base_logs_path, "training", model_type, "dsb", "best.h5")
+    instance_seg_model_path = os.path.join(base_logs_path, "training", model_type, "aureus", "weights/best.pth")
     semantic_seg_model_path = os.path.join(base_logs_path, "training", "semantic2", data, "best_unet.pth")
-    yolo_path = os.path.join(base_logs_path, "training", "yolo", f"yolov8_dsb", "weights", "best.pt")
-    cellpose_path = os.path.join(base_logs_path, "training", "cellpose", "dsb", "last.pt")
+    yolo_path = os.path.join(base_logs_path, "training", "yolo", f"yolov8_aureus", "weights", "best.pt")
+    cellpose_path = os.path.join(base_logs_path, "training", "cellpose", "aureus", "best.pt")
     stardist_path = os.path.join(base_logs_path, "training", "stardist")
 
     return instance_seg_model_path, semantic_seg_model_path, yolo_path, cellpose_path, stardist_path

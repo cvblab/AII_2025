@@ -112,7 +112,7 @@ def save_labels(labels_output_path, images_output_path, image_file, image, bound
 
 if __name__ == "__main__":
 
-    data = "neurips"  # aureus  dsb  mixed  breast subtilis neurips
+    data = "combined"  # aureus  dsb  mixed  breast subtilis neurips
     mode = "train"
     images_path, masks_path = get_dataset_path(data, mode)
     labels_output_path = f"data/train_{data}/labels"  # Path to save the txt files (create this directory)

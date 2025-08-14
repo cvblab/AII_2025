@@ -19,8 +19,8 @@ if __name__ == "__main__":
     print(torch.version.cuda)
     print("torch version:", torch.__version__)
 
-    data = "dsb"  # aureus  dsb  mixed  breast subtilis neurips
-    mode = "test"
+    data = "flow_chamber"  # aureus  dsb  mixed  breast subtilis neurips
+    mode = "train"
     images_path, masks_path = get_dataset_path(data, mode)
     dataset = create_dataset(images_path, masks_path, preprocess=True, axis_norm=(0, 1))
     print("Acquiring images from " + data + " dataset.")
@@ -45,7 +45,7 @@ if __name__ == "__main__":
     elif model_type == "unet":
         test_unet(DEVICE, test_data, instance_seg_model_path, semantic_seg_model_path, yolo_path, threshold, tp_thresholds, nms_iou_threshold, semantic=semantic)
     elif model_type == "stardist":
-        test_stardist(test_data, data, stardist_path, tp_thresholds)
+        test_stardist(test_data, "tcell", stardist_path, tp_thresholds)
     elif model_type == "semantic_segmentation":
         test_semantic_segmentation(DEVICE, test_data, semantic_seg_model_path)
     elif model_type == "cellpose":

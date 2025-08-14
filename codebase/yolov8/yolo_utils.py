@@ -30,6 +30,9 @@ def get_detection_metrics(data, mode, yolo_weights_path, semantic_seg_model_path
     metrics = []
 
     for index, test_sample in enumerate(test_data):
+        if test_sample is None:
+            print(f"[WARN] Sample {index} is None — skipping")
+            continue
 
         if input_type=="binary_masks":
             mask = test_sample['original_gt_masks'].squeeze(0).float()

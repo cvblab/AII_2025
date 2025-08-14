@@ -68,17 +68,17 @@ def train_cellpose(num_epochs, data):
     batch_size = 2
     masks_ext = "_mask"
 
-    model_dir = Path(f"/workspace/cell_segmentation/logs/training/cellpose/{data}")
-    model_dir.mkdir(parents=True, exist_ok=True)
-    model_name = str(model_dir) + "/last.pt"
-    train_data_dir = Path(f"/workspace/cell_segmentation/datasets/cellpose_data/{data}/train")
-    # train_dir.mkdir(parents=True, exist_ok=True)
+    model_dir = Path(f"../logs/training/cellpose/{data}")
+    #model_dir.mkdir(parents=True, exist_ok=True)
+    save_path = str(model_dir)
+    #train_data_dir = Path(f"/workspace/cell_segmentation/datasets/cellpose_data/{data}/train")
+    train_data_dir = Path(f"../datasets/cellpose_data/{data}/train")# train_dir.mkdir(parents=True, exist_ok=True)
     # prepare_cellpose_folder(train_data, train_dir, mask_suffix=masks_ext)
 
     output = io.load_train_test_data(str(train_data_dir),None,
                                      mask_filter=masks_ext)
     train_data, train_labels, _, test_data, test_labels, _ = output
-    model = models.CellposeModel(gpu=True)
+    model = models.CellposeModel(pretrained_model=None,gpu=True)
 
     new_model_path, train_losses, test_losses = train.train_seg(
         model.net,
@@ -89,16 +89,18 @@ def train_cellpose(num_epochs, data):
         learning_rate=learning_rate,
         weight_decay=weight_decay,
         nimg_per_epoch=max(2, len(train_data)),
-        model_name=model_name
+        save_path=save_path,
+        model_name="best.pt"
     )
 
 
 # Evaluate on test data (optional)
 def test_cellpose(DEVICE, test_data, tp_thresholds, model_path, data):
-    test_dir = Path(f"/workspace/cell_segmentation/datasets/cellpose_data/{data}/test")
+    #test_dir = Path(f"/workspace/cell_segmentation/datasets/cellpose_data/{data}/test")
+    test_dir = Path(f"../datasets/cellpose_data/{data}/test")
     #test_dir.mkdir(parents=True, exist_ok=True)
     masks_ext = "_mask"
-    #prepare_cellpose_folder(test_data, test_dir, mask_suffix=masks_ext)
+    prepare_cellpose_folder(test_data, test_dir, mask_suffix=masks_ext)
     output = io.load_train_test_data(str(test_dir), None,
                                      mask_filter=masks_ext)
     test_images, test_labels, _, _, _, _ = output
@@ -106,6 +108,7 @@ def test_cellpose(DEVICE, test_data, tp_thresholds, model_path, data):
     # Reload trained model
     model = models.CellposeModel(gpu=True, pretrained_model=model_path)
     #model = models.CellposeModel(gpu=True, model_type='nuclei')
+    model = models.CellposeModel(gpu=True)
 
     pred_masks = model.eval(test_images, batch_size=32)[0]
     ap = metrics.average_precision(test_labels, pred_masks)[0]

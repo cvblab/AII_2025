@@ -89,18 +89,18 @@ def train_sam(DEVICE, train_data, num_epochs, threshold, backbone, output_path):
                 total_FN += FN
 
                 # Optional visualization on last epoch
-                if epoch % 5 == 0 or epoch == num_epochs - 1:
-                    plot_instance_segmentation(
-                        detections=pred_masks.detach().cpu().numpy(),
-                        ground_truth=valid_gt_masks.cpu().numpy(),
-                        image=batch["image"][item_index],
-                        bounding_boxes=batch["bounding_boxes"][item_index],
-                        threshold=threshold,
-                        epoch=epoch,
-                        img_name=img_name,
-                        output_path=output_path,
-                        mode="train"
-                    )
+                #if epoch % 5 == 0 or epoch == num_epochs - 1:
+                #    plot_instance_segmentation(
+                #        detections=pred_masks.detach().cpu().numpy(),
+                #        ground_truth=valid_gt_masks.cpu().numpy(),
+                #        image=batch["image"][item_index],
+                 #       bounding_boxes=batch["bounding_boxes"][item_index],
+                 #       threshold=threshold,
+                #        epoch=epoch,
+                #        img_name=img_name,
+                #        output_path=output_path,
+                #        mode="train"
+                #    )
 
             optimizer.zero_grad()
             batch_loss.backward()
