@@ -31,11 +31,11 @@ if __name__ == "__main__":
     train_dataset = SegDataset(dataset=dataset, processor=processor)
     train_data = DataLoader(train_dataset, batch_size=2, shuffle=True, collate_fn=custom_collate_fn)
     #plot_imgs(train_data)
-    model_type = "sam"  # or "unet", "stardist" "sam"
+    model_type = "cellpose"  # or "unet", "stardist" "sam"
     num_epochs = 50
     threshold = 0.7
     env = os.environ.get("ENV", "LOCAL").lower()
-
+    #env = "docker"
     if env == "docker":
         base_output_path = "/workspace/cell_segmentation/logs"
     else:
@@ -55,4 +55,4 @@ if __name__ == "__main__":
     elif model_type == "semantic":
         train_semantic_seg(DEVICE, train_data, num_epochs, output_path=output_path)
     elif model_type == "cellpose":
-        train_cellpose(num_epochs, data)
+        train_cellpose(num_epochs, data, train_data)

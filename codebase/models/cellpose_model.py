@@ -5,7 +5,7 @@ import torch
 from PIL import Image
 import numpy as np
 from codebase.utils.visualize import plot_ap,plot_instance_segmentation
-from codebase.utils.test_utils import convert_masks_to_instances
+from codebase.utils.test_utils import convert_masks_to_instances, save_results_to_excel
 from codebase.utils.metrics import calculate_metrics,  average_precision
 import pandas as pd
 # Setup logging to see Cellpose output
@@ -61,7 +61,7 @@ def prepare_cellpose_folder(data, target_dir, mask_suffix="_mask"):
 
 
 # Train the model
-def train_cellpose(num_epochs, data):
+def train_cellpose(num_epochs, data, train_data):
 
     learning_rate = 1e-5
     weight_decay = 0.1
@@ -69,16 +69,17 @@ def train_cellpose(num_epochs, data):
     masks_ext = "_mask"
 
     model_dir = Path(f"../logs/training/cellpose/{data}")
-    #model_dir.mkdir(parents=True, exist_ok=True)
+    model_dir.mkdir(parents=True, exist_ok=True)
     save_path = str(model_dir)
     #train_data_dir = Path(f"/workspace/cell_segmentation/datasets/cellpose_data/{data}/train")
-    train_data_dir = Path(f"../datasets/cellpose_data/{data}/train")# train_dir.mkdir(parents=True, exist_ok=True)
-    # prepare_cellpose_folder(train_data, train_dir, mask_suffix=masks_ext)
+    train_data_dir = Path(f"../datasets/cellpose_data/{data}/train")#
+    #train_data_dir.mkdir(parents=True, exist_ok=True)
+    #prepare_cellpose_folder(train_data, train_data_dir, mask_suffix=masks_ext)
 
     output = io.load_train_test_data(str(train_data_dir),None,
                                      mask_filter=masks_ext)
     train_data, train_labels, _, test_data, test_labels, _ = output
-    model = models.CellposeModel(pretrained_model=None,gpu=True)
+    model = models.CellposeModel(gpu=True)
 
     new_model_path, train_losses, test_losses = train.train_seg(
         model.net,
@@ -118,6 +119,7 @@ def test_cellpose(DEVICE, test_data, tp_thresholds, model_path, data):
     pred_instances = convert_masks_to_instances(pred_masks)
 
     all_aps_per_threshold = {threshold: [] for threshold in tp_thresholds}
+    results = []
 
     for i in range(len(gt_instances)):
 
@@ -125,8 +127,19 @@ def test_cellpose(DEVICE, test_data, tp_thresholds, model_path, data):
             TP, FP, FN = calculate_metrics(pred_instances[i], gt_instances[i],
                                            threshold=threshold)
             AP = average_precision(TP, FP, FN)
+
             all_aps_per_threshold[threshold].append(AP)  # Store AP for this threshold
             print(f"Sample {i}, IoU Threshold: {threshold}, AP: {AP}, TP: {TP}, FP: {FP}, FN: {FN}")
+
+            if threshold == 0.5:
+                results.append({
+                    "Sample": i,
+                    "IoU Threshold": threshold,
+                    "AP": AP,
+                    "TP": TP,
+                    "FP": FP,
+                    "FN": FN
+                })
 
         plot_instance_segmentation(
             detections=pred_instances[i],
@@ -134,10 +147,9 @@ def test_cellpose(DEVICE, test_data, tp_thresholds, model_path, data):
             image=torch.from_numpy(test_images[i]),
             bounding_boxes=[],
             threshold=0.7,
-            epoch=0,
-            img_name=f"image_{i}.png",
-            output_path="",
-            mode="test"
+            data=data,
+            model="cellpose",
+            index = i
         )
     # Compute mean AP across all samples for each threshold
     mean_aps = {threshold: np.mean(aps) for threshold, aps in all_aps_per_threshold.items()}
@@ -146,4 +158,5 @@ def test_cellpose(DEVICE, test_data, tp_thresholds, model_path, data):
 
     # Print the DataFrame
     print(mean_ap_df)
+    save_results_to_excel(results, model="cellpose", data=data)
     shutil.rmtree(test_dir, ignore_errors=True)

@@ -19,8 +19,8 @@ if __name__ == "__main__":
     print(torch.version.cuda)
     print("torch version:", torch.__version__)
 
-    data = "flow_chamber"  # aureus  dsb  mixed  breast subtilis neurips
-    mode = "train"
+    data = "dsb"  # aureus  dsb  breast tcell flow_chamber
+    mode = "test"
     images_path, masks_path = get_dataset_path(data, mode)
     dataset = create_dataset(images_path, masks_path, preprocess=True, axis_norm=(0, 1))
     print("Acquiring images from " + data + " dataset.")
@@ -41,14 +41,14 @@ if __name__ == "__main__":
     instance_seg_model_path, semantic_seg_model_path, yolo_path, cellpose_path, stardist_path = get_model_paths(data, model_type)
 
     if model_type == "sam":
-        test_sam(DEVICE, test_data, instance_seg_model_path, semantic_seg_model_path, yolo_path, tp_thresholds, nms_iou_threshold, backbone="base", semantic=semantic)
+        test_sam(DEVICE, data, test_data, instance_seg_model_path, semantic_seg_model_path, yolo_path, tp_thresholds, nms_iou_threshold, backbone="base", semantic=semantic)
     elif model_type == "unet":
-        test_unet(DEVICE, test_data, instance_seg_model_path, semantic_seg_model_path, yolo_path, threshold, tp_thresholds, nms_iou_threshold, semantic=semantic)
+        test_unet(DEVICE, data, test_data, instance_seg_model_path, semantic_seg_model_path, yolo_path, threshold, tp_thresholds, nms_iou_threshold, semantic=semantic)
     elif model_type == "stardist":
-        test_stardist(test_data, "tcell", stardist_path, tp_thresholds)
+        test_stardist(data,test_data, "combined", stardist_path, tp_thresholds)
     elif model_type == "semantic_segmentation":
         test_semantic_segmentation(DEVICE, test_data, semantic_seg_model_path)
     elif model_type == "cellpose":
-        test_cellpose(DEVICE, test_data, tp_thresholds, cellpose_path, data)
+        test_cellpose(DEVICE,test_data, tp_thresholds, cellpose_path, data)
     elif model_type == "cellsam":
-        test_cellsam(DEVICE, test_data, tp_thresholds)
+        test_cellsam(DEVICE, data,test_data, tp_thresholds)

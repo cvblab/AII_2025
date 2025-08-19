@@ -43,12 +43,13 @@ def plot_nms(image, gt_boxes, original_bboxes, filtered_bboxes, iou_threshold):
     plt.show()
 
 
-def plot_instance_segmentation(detections, ground_truth, image, bounding_boxes, threshold, epoch, img_name, output_path, mode):
+def plot_instance_segmentation(detections, ground_truth, image, bounding_boxes, threshold, data, model, index):
     """
        Detections and ground_truth numpy array (n_objects, 256, 256)
        Image torch tensor (256,256,3)
        Plots original image, ground truth, input_prompt, predictions, and TP,FP
-       """
+       Saves TP/FN/FP mask to logs/results/{model}/{data}/ directory
+    """
     print(f"Image dtype: {image.dtype}, min: {image.min()}, max: {image.max()}")
 
     if ground_truth.ndim == 2:
@@ -57,64 +58,51 @@ def plot_instance_segmentation(detections, ground_truth, image, bounding_boxes, 
     if detections.ndim == 2:
         detections = np.expand_dims(detections, axis=0)
 
-    print("ground_truth shape:", ground_truth.shape)
-    print("detections shape:", detections.shape)
-    num_objects = ground_truth.shape[0]  # Number of objects
-    num_detections = detections.shape[0]  # Number of detected objects
+    num_objects = ground_truth.shape[0]
+    num_detections = detections.shape[0]
 
-    # Define a colormap for consistent coloring
     colors = [np.random.randint(0, 255, size=3) for _ in range(max(num_objects, num_detections))]
 
-    # Plot combined ground truth and predicted masks with the same colors for corresponding objects
     fig, axs = plt.subplots(1, 5, figsize=(20, 5))
 
     if isinstance(image, torch.Tensor):
         image = image.cpu().numpy()
 
-    # Transpose image for correct display (if it's in CHW format)
-    if image.ndim == 3 and image.shape[0] == 3:  # likely CHW format
+    if image.ndim == 3 and image.shape[0] == 3:
         image = np.transpose(image, (1, 2, 0))
 
-    # Normalize only if dtype is uint8 (i.e., values in 0–255)
     if image.dtype == np.uint8:
         image = image.astype(np.float32) / 255.0
     else:
         image = image.astype(np.float32)
-    # NEW
+
     image = np.clip(image, 0.0, 1.0)
 
-    # Plot original image
     axs[0].imshow(image)
     axs[0].set_title("Original Image")
     axs[0].axis('off')
 
-    # Combine ground truth masks for visualization (assign consistent colors)
-    num_objects = ground_truth.shape[0]
     combined_ground_truth_color = np.zeros((ground_truth.shape[1], ground_truth.shape[2], 3), dtype=np.uint8)
     for i in range(num_objects):
-        combined_ground_truth_color[ground_truth[i] > 0] = colors[i]  # Use consistent color per object
+        combined_ground_truth_color[ground_truth[i] > 0] = colors[i]
 
     axs[1].imshow(combined_ground_truth_color)
     axs[1].set_title("Ground Truth Masks")
     axs[1].axis('off')
 
-    # Combine ground truth masks for visualization (assign consistent colors)
     combined_ground_truth = np.zeros((ground_truth.shape[1], ground_truth.shape[2]), dtype=np.uint8)
     for i in range(num_objects):
-        combined_ground_truth[ground_truth[i] > 0] = 1  # Binary representation
+        combined_ground_truth[ground_truth[i] > 0] = 1
 
-    # Plot combined ground truth with bounding boxes
     axs[2].imshow(combined_ground_truth, cmap='gray')
     axs[2].set_title("Ground Truth with Input Prompt")
     axs[2].axis('off')
 
-    # Draw bounding boxes on the combined ground truth mask
     for box in bounding_boxes:
         rect = patches.Rectangle((box[0], box[1]), box[2] - box[0], box[3] - box[1],
                                  linewidth=2, edgecolor='red', facecolor='none')
         axs[2].add_patch(rect)
 
-    # Combine predicted masks for visualization (assign same colors)
     detections = (detections > 0.5).astype(np.uint8)
     detections = fill_small_holes_in_masks(detections, area_threshold=100)
 
@@ -124,7 +112,7 @@ def plot_instance_segmentation(detections, ground_truth, image, bounding_boxes, 
 
     combined_detections = np.zeros((detections.shape[1], detections.shape[2], 3), dtype=np.uint8)
     for i in range(num_detections):
-        mask = detections[i, :, :] > 0  # Assumes the mask is in the first channel for each object
+        mask = detections[i, :, :] > 0
         combined_detections[mask] = colors[i % len(colors)]
 
     axs[3].imshow(combined_detections)
@@ -142,7 +130,7 @@ def plot_instance_segmentation(detections, ground_truth, image, bounding_boxes, 
 
         for gt_idx, gt_mask in enumerate(ground_truth):
             if gt_idx in matched_gt:
-                continue  # Skip already matched ground truth masks
+                continue
 
             iou = calculate_iou(pred_mask, gt_mask)
 
@@ -151,33 +139,27 @@ def plot_instance_segmentation(detections, ground_truth, image, bounding_boxes, 
                 best_gt_idx = gt_idx
 
         if best_iou >= threshold:
-            # True Positive: Mark the predicted mask as green
-            tp_fn_fp_mask[pred_mask > 0] = [0, 255, 0]  # Green
+            tp_fn_fp_mask[pred_mask > 0] = [0, 255, 0]  # TP = green
             matched_gt.add(best_gt_idx)
             matched_detections.add(det_idx)
         else:
-            # False Positive: Mark the unmatched predicted mask as red
-            tp_fn_fp_mask[pred_mask > 0] = [255, 0, 0]  # Red
+            tp_fn_fp_mask[pred_mask > 0] = [255, 0, 0]  # FP = red
 
-    # Plot the TP and FN visualization
     axs[4].imshow(tp_fn_fp_mask)
     axs[4].set_title(f"TP & FN (Threshold = {threshold})")
     axs[4].axis('off')
 
     plt.tight_layout()
 
-    if mode != "test":
-        output_dir = f"{output_path}/epoch_{epoch}"
-        os.makedirs(output_dir, exist_ok=True)  # Create the directory if it doesn't exist
-        # Filepath to save the plot
-        output_path = os.path.join(output_dir, img_name)
-        base, ext = os.path.splitext(output_path)
-        if ext.lower() == '.bmp':
-            output_path = base + '.png'
+    # ------------------- SAVE -------------------
+    save_dir = os.path.join("..", "logs", "results", model, data)
+    os.makedirs(save_dir, exist_ok=True)
 
-        plt.savefig(output_path, dpi=300)
+    save_path = os.path.join(save_dir, f"img_{index}.png")
+    fig.savefig(save_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
 
-    plt.show()
+    print(f"[INFO] Saved full visualization layout to {save_path}")
 
 
 def plot_semantic_segmentation(pred_mask, gt_mask, input_tensor):

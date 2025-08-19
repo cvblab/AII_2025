@@ -4,7 +4,7 @@ import os
 import numpy as np
 from codebase.utils.metrics import calculate_metrics,  average_precision
 from codebase.utils.visualize import plot_ap,plot_instance_segmentation,plot_loss, calculate_bbox_accuracy,plot_semantic_segmentation
-from codebase.utils.test_utils import get_yolo_bboxes, nms, pad_predictions, fill_small_holes_in_masks
+from codebase.utils.test_utils import get_yolo_bboxes, nms, pad_predictions, save_results_to_excel
 from codebase.models.unet_semantic_segmentation import predict_binary_mask
 import torch.nn as nn
 import monai
@@ -128,7 +128,7 @@ def train_sam(DEVICE, train_data, num_epochs, threshold, backbone, output_path):
     plot_ap(average_precisions_list, num_epochs, output_path)
 
 
-def test_sam(DEVICE, test_data, sam_model_path, semantic_seg_model_path, yolo_path, tp_thresholds, nms_iou_threshold, backbone, semantic=False):
+def test_sam(DEVICE, data,test_data, sam_model_path, semantic_seg_model_path, yolo_path, tp_thresholds, nms_iou_threshold, backbone, semantic=False):
 
     model, model_processor, optimizer, bce_loss_fn, seg_loss = get_sam_model(DEVICE, backbone)
     print("Testing SAM")
@@ -138,6 +138,7 @@ def test_sam(DEVICE, test_data, sam_model_path, semantic_seg_model_path, yolo_pa
     model.to(DEVICE)
     model.eval()
     all_aps_per_threshold = {threshold: [] for threshold in tp_thresholds}
+    results = []
 
     for index, test_sample in enumerate(test_data):
         if test_sample is None or len(test_sample["image"]) == 0:
@@ -177,21 +178,32 @@ def test_sam(DEVICE, test_data, sam_model_path, semantic_seg_model_path, yolo_pa
             all_aps_per_threshold[threshold].append(AP)  # Store AP for this threshold
             print(f"Sample {index}, IoU Threshold: {threshold}, AP: {AP}, TP: {TP}, FP: {FP}, FN: {FN}")
 
+            if threshold == 0.5:
+                results.append({
+                    "Sample": index,
+                    "IoU Threshold": threshold,
+                    "AP": AP,
+                    "TP": TP,
+                    "FP": FP,
+                    "FN": FN
+                })
+
         plot_instance_segmentation(
            detections=pred_masks.detach().cpu().numpy(),
            ground_truth=gt_masks.cpu().numpy(),
            image=test_sample["image"].squeeze(0),
            bounding_boxes=yolo_boxes_nms.cpu().numpy(),
            threshold=0.7,
-           epoch=0,
-           img_name="",
-           output_path = "",
-           mode = "test"
+           data=data,
+           model="sam",
+           index=index
         )
     # Compute mean AP across all samples for each threshold
     mean_aps = {threshold: np.mean(aps) for threshold, aps in all_aps_per_threshold.items()}
     mean_ap_df = pd.DataFrame(list(mean_aps.items()), columns=["IoU Threshold", "Mean AP"])
     print(mean_ap_df)
+
+    save_results_to_excel(results, model="sam", data=data)
 
 
 def get_sam_model(DEVICE, backbone):

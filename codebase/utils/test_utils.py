@@ -2,6 +2,9 @@ import torch
 from ultralytics import YOLO
 import numpy as np
 from skimage.morphology import remove_small_holes
+import os
+import pandas as pd
+import openpyxl
 
 def nms(boxes, scores, iou_threshold=0.5):
 
@@ -113,3 +116,25 @@ def fill_small_holes_in_masks(masks: np.ndarray, area_threshold: int = 100) -> n
         filled_masks.append(filled.astype(np.uint8))
 
     return np.array(filled_masks)
+
+
+def save_results_to_excel(results, model, data, filename="ap_threshold_0.5.xlsx"):
+    """
+    Save results of AP, TP, FP, FN (for IoU threshold 0.5) to Excel.
+
+    Args:
+        results (list of dicts): Each dict should contain keys:
+            ["Sample", "IoU Threshold", "AP", "TP", "FP", "FN"]
+        model (str): Model name
+        data (str): Dataset name
+        filename (str): Name of the Excel file
+    """
+    save_dir = os.path.join("..", "logs", "results", model, data)
+    os.makedirs(save_dir, exist_ok=True)
+
+    df = pd.DataFrame(results)
+    save_path = os.path.join(save_dir, filename)
+    df.to_excel(save_path, index=False)
+
+    print(f"[INFO] Saved results to {save_path}")
+    return save_path

@@ -202,7 +202,7 @@ def train_unet(DEVICE, train_data, num_epochs, threshold, output_path):
 
 
 
-def test_unet(DEVICE, test_data, unet_model_path, semantic_seg_model_path, yolo_path, threshold, tp_thresholds, nms_iou_threshold, semantic=False):
+def test_unet(DEVICE, data,test_data, unet_model_path, semantic_seg_model_path, yolo_path, threshold, tp_thresholds, nms_iou_threshold, semantic=False):
 
     model, optimizer, bce_loss_fn = get_unet(DEVICE)
     print("Testing U-Net")

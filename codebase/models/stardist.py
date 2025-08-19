@@ -6,6 +6,8 @@ from codebase.Stardist.stardist import gputools_available
 from codebase.Stardist.stardist.models import Config2D, StarDist2D
 from codebase.Stardist.stardist import random_label_cmap
 from codebase.utils.metrics import calculate_metrics,  average_precision
+from codebase.utils.visualize import plot_instance_segmentation
+from codebase.utils.test_utils import save_results_to_excel
 import pandas as pd
 
 lbl_cmap = random_label_cmap()
@@ -33,6 +35,10 @@ def label_to_binary_masks(label_image):
 
     ids = np.unique(label_image)
     ids = ids[ids != 0]  # remove background
+
+    if len(ids) == 0:
+        return None
+
     masks = np.stack([(label_image == i).astype(np.uint8) for i in ids], axis=0)
     return masks  # Shape: (num_objects, H, W)
 
@@ -69,16 +75,17 @@ def train_stardist(DEVICE, train_data, num_epochs, threshold, output_path):
 
     return model
 
-def test_stardist(test_data, data, stardist_path, tp_thresholds):
+def test_stardist(data, test_data, train_data, stardist_path, tp_thresholds):
     #model = StarDist2D(None, name="stardist_fluorescence", basedir="../weights/")
-    #model = StarDist2D.from_pretrained('2D_paper_dsb2018')
-    model = StarDist2D(None, name=data, basedir=stardist_path)
+    model = StarDist2D.from_pretrained('2D_paper_dsb2018')
+    model = StarDist2D(None, name=train_data, basedir=stardist_path)
     all_aps_per_threshold = {threshold: [] for threshold in tp_thresholds}
-
+    results = []
     for index, test_sample in enumerate(test_data):
         if test_sample is None:
-            print("Warning: No image in test sample — skipping")
+            print(f"Skipping sample {index}: no image in test sample")
             continue
+
         img = test_sample["image"].squeeze()
         grayscale_image = img.permute(2, 0, 1).float().mean(dim=0)
         axis_norm = (0, 1)  # normalize channels independently
@@ -87,50 +94,48 @@ def test_stardist(test_data, data, stardist_path, tp_thresholds):
 
         labels, details = model.predict_instances(image)
 
-        print("Detected cells:", len(np.unique(labels)))
-        print("Groundtruth cells:", len(np.unique(gt_mask)))
+        print("Detected cells:", len(np.unique(labels)) - 1)  # -1 to ignore background
+        print("Groundtruth cells:", len(np.unique(gt_mask)) - 1)
 
-        # Collect all unique label IDs from both masks
-        all_labels = np.unique(np.concatenate((np.unique(test_sample['original_gt_masks'].squeeze().numpy()), np.unique(labels))))
-        num_labels = all_labels.max() + 1  # Ensure we include all label indices
-
-        # Create a consistent colormap
-        cmap = plt.get_cmap('nipy_spectral', num_labels)
-
-        fig, axes = plt.subplots(1, 3, figsize=(18, 6))
-
-        # Panel 1: Original grayscale image
-        axes[0].imshow(image, cmap='gray')
-        axes[0].set_title('Original Image')
-        axes[0].axis('off')
-
-        # Panel 2: Ground Truth
-        im0 = axes[1].imshow(gt_mask, cmap=cmap, vmin=0, vmax=num_labels - 1)
-        axes[1].set_title('Ground Truth Mask')
-        axes[1].axis('off')
-
-        # Panel 3: Predicted Labels
-        im1 = axes[2].imshow(labels, cmap=cmap, vmin=0, vmax=num_labels - 1)
-        axes[2].set_title('Predicted Labels')
-        axes[2].axis('off')
-
-        plt.tight_layout()
-        plt.show()
-
+        # Convert to binary masks
         det_masks = label_to_binary_masks(labels)
         gt_masks = label_to_binary_masks(gt_mask)
 
+        # If either is None, skip
+        if det_masks is None or gt_masks is None:
+            print(f"Skipping sample {index}: empty prediction or ground truth")
+            continue
+
+        # --- Metrics ---
         for threshold in tp_thresholds:
-            TP, FP, FN = calculate_metrics(det_masks, gt_masks,
-                                           threshold=threshold)
+            TP, FP, FN = calculate_metrics(det_masks, gt_masks, threshold=threshold)
             AP = average_precision(TP, FP, FN)
             all_aps_per_threshold[threshold].append(AP)
             print(f"Sample {index}, IoU Threshold: {threshold}, AP: {AP}, TP: {TP}, FP: {FP}, FN: {FN}")
 
-        # Compute mean AP across all samples for each threshold
-    mean_aps = {threshold: np.mean(aps) for threshold, aps in all_aps_per_threshold.items()}
+            if threshold == 0.5:
+                results.append({
+                    "Sample": index,
+                    "IoU Threshold": threshold,
+                    "AP": AP,
+                    "TP": TP,
+                    "FP": FP,
+                    "FN": FN
+                })
 
+        plot_instance_segmentation(
+            detections=det_masks,
+            ground_truth=gt_masks,
+            image=test_sample["image"].squeeze(0),
+            bounding_boxes=[],
+            threshold=0.7,
+            data=data,
+            model="stardist",
+            index=index
+        )
+    # Compute mean AP across all samples
+    mean_aps = {threshold: np.mean(aps) for threshold, aps in all_aps_per_threshold.items() if aps}
     mean_ap_df = pd.DataFrame(list(mean_aps.items()), columns=["IoU Threshold", "Mean AP"])
-
-    # Print the DataFrame
     print(mean_ap_df)
+
+    save_results_to_excel(results, model="stardist", data=data)
