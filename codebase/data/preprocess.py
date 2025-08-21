@@ -58,6 +58,7 @@ def augment_dataset_with_original(dataset, augmenter):
 
     return Dataset.from_dict(augmented_data)
 
+
 def random_fliprot(img, mask):
     """
     Apply random flips and rotations to image and mask.

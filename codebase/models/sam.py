@@ -67,8 +67,6 @@ def train_sam(DEVICE, train_data, num_epochs, threshold, backbone, output_path):
             for item_index in range(len(batch["image"])):
 
                 num_objects = batch['num_objects_per_image'][item_index]
-                img_path = batch['path'][item_index]
-                img_name = os.path.basename(img_path)
                 valid_bboxes = batch["bounding_boxes"][item_index][:num_objects]
                 valid_gt_masks = batch['instance_gt_masks'][item_index][:num_objects].float().to(DEVICE)
                 pred_masks = predict_masks(DEVICE, model, model_processor, batch["image"][item_index].to(DEVICE),
@@ -87,20 +85,6 @@ def train_sam(DEVICE, train_data, num_epochs, threshold, backbone, output_path):
                 total_TP += TP
                 total_FP += FP
                 total_FN += FN
-
-                # Optional visualization on last epoch
-                #if epoch % 5 == 0 or epoch == num_epochs - 1:
-                #    plot_instance_segmentation(
-                #        detections=pred_masks.detach().cpu().numpy(),
-                #        ground_truth=valid_gt_masks.cpu().numpy(),
-                #        image=batch["image"][item_index],
-                 #       bounding_boxes=batch["bounding_boxes"][item_index],
-                 #       threshold=threshold,
-                #        epoch=epoch,
-                #        img_name=img_name,
-                #        output_path=output_path,
-                #        mode="train"
-                #    )
 
             optimizer.zero_grad()
             batch_loss.backward()

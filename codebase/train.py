@@ -35,7 +35,6 @@ if __name__ == "__main__":
     num_epochs = 50
     threshold = 0.7
     env = os.environ.get("ENV", "LOCAL").lower()
-    #env = "docker"
     if env == "docker":
         base_output_path = "/workspace/cell_segmentation/logs"
     else:

@@ -1,6 +1,5 @@
 from __future__ import print_function, unicode_literals, absolute_import, division
 import numpy as np
-import matplotlib.pyplot as plt
 from csbdeep.utils import normalize
 from codebase.Stardist.stardist import gputools_available
 from codebase.Stardist.stardist.models import Config2D, StarDist2D
@@ -75,9 +74,9 @@ def train_stardist(DEVICE, train_data, num_epochs, threshold, output_path):
 
     return model
 
+
 def test_stardist(data, test_data, train_data, stardist_path, tp_thresholds):
-    #model = StarDist2D(None, name="stardist_fluorescence", basedir="../weights/")
-    model = StarDist2D.from_pretrained('2D_paper_dsb2018')
+    #model = StarDist2D.from_pretrained('2D_paper_dsb2018')
     model = StarDist2D(None, name=train_data, basedir=stardist_path)
     all_aps_per_threshold = {threshold: [] for threshold in tp_thresholds}
     results = []

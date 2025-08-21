@@ -1,4 +1,3 @@
-import matplotlib.pyplot as plt
 import numpy as np
 from cellSAM import segment_cellular_image
 from codebase.utils.metrics import calculate_metrics,  average_precision

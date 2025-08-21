@@ -108,9 +108,6 @@ def test_cellpose(DEVICE, test_data, tp_thresholds, model_path, data):
 
     # Reload trained model
     model = models.CellposeModel(gpu=True, pretrained_model=model_path)
-    #model = models.CellposeModel(gpu=True, model_type='nuclei')
-    model = models.CellposeModel(gpu=True)
-
     pred_masks = model.eval(test_images, batch_size=32)[0]
     ap = metrics.average_precision(test_labels, pred_masks)[0]
     print(f'\n>>> Average Precision @ IoU 0.5: {ap[:, 0].mean():.3f}')

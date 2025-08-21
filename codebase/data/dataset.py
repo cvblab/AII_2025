@@ -7,7 +7,6 @@ from torch.utils.data import Dataset as TorchDataset
 from torchvision.transforms import CenterCrop
 import torch
 from .preprocess import get_bounding_boxes, preprocess_data
-import os
 import imageio.v2 as imageio
 import matplotlib.pyplot as plt
 import os
@@ -16,7 +15,6 @@ import os
 
 def get_dataset_path(data, mode):
     env = os.environ.get("ENV", "LOCAL").lower()
-    #env = "docker"
     if env == "docker":
         base_dataset_path = "/workspace/cell_segmentation/datasets"
     else:
@@ -68,16 +66,15 @@ def get_dataset_path(data, mode):
 def get_model_paths(data, model_type):
 
     env = os.environ.get("ENV", "LOCAL").lower()
-    #env = "docker"
     if env == "docker":
         base_logs_path = "/workspace/cell_segmentation/logs"
     else:
         base_logs_path = "../logs" # Running locally (venv)
 
-    instance_seg_model_path = os.path.join(base_logs_path, "training", model_type, "dsb", "weights/best.pth")
+    instance_seg_model_path = os.path.join(base_logs_path, "training", model_type, "combined", "weights/best.pth")
     semantic_seg_model_path = os.path.join(base_logs_path, "training", "semantic2", data, "best_unet.pth")
     yolo_path = os.path.join(base_logs_path, "training", "yolo", f"yolov8_combined", "weights", "best.pt")
-    cellpose_path = os.path.join(base_logs_path, "training", "cellpose", "aureus", "best.pt")
+    cellpose_path = os.path.join(base_logs_path, "training", "cellpose", "combined", "best.pt")
     stardist_path = os.path.join(base_logs_path, "training", "stardist")
 
     return instance_seg_model_path, semantic_seg_model_path, yolo_path, cellpose_path, stardist_path

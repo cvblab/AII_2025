@@ -8,7 +8,7 @@ from data.dataset import SegDataset, create_dataset, custom_collate_fn, get_data
 import numpy as np
 from models.sam import test_sam
 from models.stardist import test_stardist
-from models.unet import test_unet_tf, test_unet
+from models.unet import test_unet
 from models.unet_semantic_segmentation import test_semantic_segmentation
 from models.cellpose_model import test_cellpose
 from models.run_cellsam import test_cellsam
@@ -19,7 +19,7 @@ if __name__ == "__main__":
     print(torch.version.cuda)
     print("torch version:", torch.__version__)
 
-    data = "dsb"  # aureus  dsb  breast tcell flow_chamber
+    data = "aureus"  # aureus  dsb  breast tcell flow_chamber
     mode = "test"
     images_path, masks_path = get_dataset_path(data, mode)
     dataset = create_dataset(images_path, masks_path, preprocess=True, axis_norm=(0, 1))
