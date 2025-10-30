@@ -1,22 +1,23 @@
 import torch
 from torch.utils.data import DataLoader
-from transformers import SamProcessor, SamModel, AutoModel, AutoProcessor
+from transformers import SamProcessor
 from codebase.data.dataset import create_dataset, SegDataset, custom_collate_fn, get_dataset_path
 from models.sam import train_sam
 from models.unet import train_unet
 from models.stardist import train_stardist
 from models.unet_semantic_segmentation import train_semantic_seg
 from models.cellpose_model import train_cellpose
-from codebase.utils.visualize import plot_imgs
 import os
+
 
 if __name__ == "__main__":
     print(os.getcwd())
     print("torch version:", torch.__version__)
-    print(torch.cuda.is_available())  # True
-    print(torch.version.cuda)  # '12.5'
+    print(torch.cuda.is_available())
+    print(torch.version.cuda)
 
-    data = "combined" # aureus  dsb  mixed  breast subtilis neurips combined
+    # choose dataset
+    data = "combined" # aureus  dsb breast tcell flow_chamber combined (dsb, aureus and tcell)
     mode = "train"
     images_path, masks_path = get_dataset_path(data, mode)
     dataset = create_dataset(images_path, masks_path, preprocess=True, axis_norm=(0, 1))
@@ -30,11 +31,11 @@ if __name__ == "__main__":
     processor = SamProcessor.from_pretrained("facebook/sam-vit-base")
     train_dataset = SegDataset(dataset=dataset, processor=processor)
     train_data = DataLoader(train_dataset, batch_size=2, shuffle=True, collate_fn=custom_collate_fn)
-    #plot_imgs(train_data)
-    model_type = "cellpose"  # or "unet", "stardist" "sam"
+    model_type = "cellpose"  # or "unet", "stardist" "sam", "cellpose"
     num_epochs = 50
     threshold = 0.7
     env = os.environ.get("ENV", "LOCAL").lower()
+
     if env == "docker":
         base_output_path = "/workspace/cell_segmentation/logs"
     else:
@@ -47,8 +48,6 @@ if __name__ == "__main__":
 
     if model_type == "sam": # base large huge
         train_sam(DEVICE, train_data, num_epochs, threshold, backbone="base", output_path=output_path)
-    elif model_type == "unet":
-        train_unet(DEVICE, train_data, num_epochs, threshold, output_path=output_path)
     elif model_type == "stardist":
         train_stardist(DEVICE, train_data, num_epochs, threshold, output_path=output_path)
     elif model_type == "semantic":

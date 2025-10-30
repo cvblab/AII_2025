@@ -11,7 +11,7 @@ from models.stardist import test_stardist
 from models.unet import test_unet
 from models.unet_semantic_segmentation import test_semantic_segmentation
 from models.cellpose_model import test_cellpose
-from models.run_cellsam import test_cellsam
+from models.run_cellsam import run_cellsam
 
 
 if __name__ == "__main__":
@@ -19,6 +19,7 @@ if __name__ == "__main__":
     print(torch.version.cuda)
     print("torch version:", torch.__version__)
 
+    #choose dataset
     data = "aureus"  # aureus  dsb  breast tcell flow_chamber
     mode = "test"
     images_path, masks_path = get_dataset_path(data, mode)
@@ -33,7 +34,7 @@ if __name__ == "__main__":
     test_dataset = SegDataset(dataset=dataset, processor=processor)
     test_data = DataLoader(test_dataset, batch_size=1, shuffle=True, collate_fn=custom_collate_fn)
 
-    model_type = "cellsam"  # or "unet", "stardist" "sam"
+    model_type = "cellpose"  # or "cellpose", "stardist" "sam", "cellsam
     semantic = False
     threshold = 0.7
     nms_iou_threshold = 0.5
@@ -42,8 +43,6 @@ if __name__ == "__main__":
 
     if model_type == "sam":
         test_sam(DEVICE, data, test_data, instance_seg_model_path, semantic_seg_model_path, yolo_path, tp_thresholds, nms_iou_threshold, backbone="base", semantic=semantic)
-    elif model_type == "unet":
-        test_unet(DEVICE, data, test_data, instance_seg_model_path, semantic_seg_model_path, yolo_path, threshold, tp_thresholds, nms_iou_threshold, semantic=semantic)
     elif model_type == "stardist":
         test_stardist(data,test_data, "combined", stardist_path, tp_thresholds)
     elif model_type == "semantic_segmentation":
@@ -51,4 +50,4 @@ if __name__ == "__main__":
     elif model_type == "cellpose":
         test_cellpose(DEVICE,test_data, tp_thresholds, cellpose_path, data)
     elif model_type == "cellsam":
-        test_cellsam(DEVICE, data,test_data, tp_thresholds)
+        run_cellsam(DEVICE, data,test_data, tp_thresholds)

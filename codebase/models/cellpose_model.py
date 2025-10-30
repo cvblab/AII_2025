@@ -58,9 +58,6 @@ def prepare_cellpose_folder(data, target_dir, mask_suffix="_mask"):
     print(f"Saved images and masks in {target_dir}")
 
 
-
-
-# Train the model
 def train_cellpose(num_epochs, data, train_data):
 
     learning_rate = 1e-5

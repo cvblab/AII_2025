@@ -12,7 +12,6 @@ import matplotlib.pyplot as plt
 import os
 
 
-
 def get_dataset_path(data, mode):
     env = os.environ.get("ENV", "LOCAL").lower()
     if env == "docker":
@@ -62,7 +61,6 @@ def get_dataset_path(data, mode):
     return images_path, masks_path
 
 
-
 def get_model_paths(data, model_type):
 
     env = os.environ.get("ENV", "LOCAL").lower()
@@ -78,7 +76,6 @@ def get_model_paths(data, model_type):
     stardist_path = os.path.join(base_logs_path, "training", "stardist")
 
     return instance_seg_model_path, semantic_seg_model_path, yolo_path, cellpose_path, stardist_path
-
 
 
 def plot_images_and_masks(images, masks, max_samples=10):
@@ -117,7 +114,6 @@ def plot_images_and_masks(images, masks, max_samples=10):
     plt.show()
 
 
-
 def normalize_image(img):
     img = img.astype(np.float32)
     min_val, max_val = img.min(), img.max()
@@ -126,7 +122,6 @@ def normalize_image(img):
         return np.zeros_like(img)
     else:
         return (img - min_val) / denom
-
 
 
 def create_dataset(images_path, masks_path, preprocess=True, axis_norm=(0, 1)):
@@ -148,7 +143,6 @@ def create_dataset(images_path, masks_path, preprocess=True, axis_norm=(0, 1)):
     dataset = Dataset.from_dict(dataset_dict)
 
     return dataset
-
 
 
 def read_image(path):
@@ -271,7 +265,6 @@ class SegDataset(TorchDataset):
             "path": path,
             **inputs
         }
-
 
 
 def custom_collate_fn(batch):

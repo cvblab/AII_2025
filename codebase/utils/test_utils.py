@@ -4,7 +4,6 @@ import numpy as np
 from skimage.morphology import remove_small_holes
 import os
 import pandas as pd
-import openpyxl
 
 def nms(boxes, scores, iou_threshold=0.5):
 

@@ -76,6 +76,9 @@ def train_stardist(DEVICE, train_data, num_epochs, threshold, output_path):
 
 
 def test_stardist(data, test_data, train_data, stardist_path, tp_thresholds):
+    """
+        Test the model with the given the test dataset and the model path.
+    """
     #model = StarDist2D.from_pretrained('2D_paper_dsb2018')
     model = StarDist2D(None, name=train_data, basedir=stardist_path)
     all_aps_per_threshold = {threshold: [] for threshold in tp_thresholds}

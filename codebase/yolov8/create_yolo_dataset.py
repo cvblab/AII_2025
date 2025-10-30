@@ -1,15 +1,13 @@
 import numpy as np
 import cv2
-import glob
-import os
 from matplotlib import pyplot as plt
 import torch
-from skimage.filters.rank import threshold
 from torch.utils.data import DataLoader
-from transformers import SamProcessor, SamModel, AutoModel, AutoProcessor
+from transformers import SamProcessor
 from codebase.data.dataset import SegDataset, create_dataset, custom_collate_fn, get_dataset_path
 import os
 import matplotlib.patches as patches
+
 
 def plot_bboxes(ground_truth, image, bounding_boxes):
     num_objects = ground_truth.shape[0]  # Number of objects # Number of detected objects
@@ -58,13 +56,14 @@ def plot_bboxes(ground_truth, image, bounding_boxes):
     plt.tight_layout()
     plt.show()
 
+
 def save_labels(labels_output_path, images_output_path, image_file, image, bounding_boxes):
     # Ensure the image is a NumPy array
     if isinstance(image, torch.Tensor):
         image = image.numpy()  # Convert CHW to HWC
 
     image = (image * 255).astype(np.uint8)
- # Convert to uint8 for OpenCV
+    # Convert to uint8 for OpenCV
 
     # Set output path for the image (with .tiff extension)
     single_image_output_path = os.path.join(images_output_path, os.path.splitext(os.path.basename(image_file))[0] + '.tiff')
@@ -112,7 +111,7 @@ def save_labels(labels_output_path, images_output_path, image_file, image, bound
 
 if __name__ == "__main__":
 
-    data = "combined"  # aureus  dsb  mixed  breast subtilis neurips
+    data = "combined"  # aureus  dsb breast tcell flow_chamber
     mode = "train"
     images_path, masks_path = get_dataset_path(data, mode)
     labels_output_path = f"data/train_{data}/labels"  # Path to save the txt files (create this directory)

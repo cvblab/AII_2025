@@ -6,12 +6,13 @@ from codebase.utils.test_utils import save_results_to_excel
 import pandas as pd
 
 
-def test_cellsam(DEVICE, data, test_data, tp_thresholds):
+def run_cellsam(DEVICE, data, test_data, tp_thresholds):
 
     all_aps_per_threshold = {threshold: [] for threshold in tp_thresholds}
     results = []
-    # Inference loop
+
     for index, test_sample in enumerate(test_data):
+        # Skip empty batches
         if test_sample is None or len(test_sample["image"]) == 0:
             print(f"Skipping empty batch {index}.")
             continue
@@ -20,7 +21,6 @@ def test_cellsam(DEVICE, data, test_data, tp_thresholds):
             print(f"[WARNING] No bounding boxes for sample: {test_sample['image_path']}")
             continue
 
-        gt_bboxes = test_sample["bounding_boxes"].squeeze(0)
         gt_masks = test_sample['instance_gt_masks'].squeeze(0).float().to(DEVICE)
 
         # Convert torch tensor to numpy array

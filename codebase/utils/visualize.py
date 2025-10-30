@@ -23,7 +23,7 @@ def plot_bboxes_nms(ax, image, bboxes):
 def plot_nms(image, gt_boxes, original_bboxes, filtered_bboxes, iou_threshold):
     """
        Plot bboxes before and after NMS
-       """
+    """
     # Plot the original and filtered bounding boxes
     fig, axs = plt.subplots(1, 3, figsize=(10, 5))
 
@@ -151,7 +151,7 @@ def plot_instance_segmentation(detections, ground_truth, image, bounding_boxes, 
 
     plt.tight_layout()
 
-    # ------------------- SAVE -------------------
+    # Save results
     save_dir = os.path.join("..", "logs", "results", model, data)
     os.makedirs(save_dir, exist_ok=True)
 
@@ -197,6 +197,7 @@ def plot_semantic_segmentation(pred_mask, gt_mask, input_tensor):
 
 
 def visualize_single_cells(input_tensor, gt_masks, preds, binary_preds):
+
     if torch.is_tensor(input_tensor):
         input_tensor = input_tensor.cpu().numpy()
     if torch.is_tensor(gt_masks):
@@ -279,7 +280,7 @@ def plot_loss(epoch_losses_list,num_epochs,output_path):
     os.makedirs(output_folder, exist_ok=True)
     plot_save_path = f"{output_folder}/{num_epochs}_loss.png"
     plt.savefig(plot_save_path)
-    #plt.show()
+    plt.show()
 
 
 def plot_ap(average_precisions_list,num_epochs,output_path):
@@ -295,13 +296,13 @@ def plot_ap(average_precisions_list,num_epochs,output_path):
     os.makedirs(output_folder, exist_ok=True)
     plot_save_path = f"{output_folder}/{num_epochs}_ap.png"
     plt.savefig(plot_save_path)
-    #plt.show()
+    plt.show()
 
 
 def calculate_bbox_accuracy(ground_truth_boxes, predicted_boxes, iou_threshold=0.5):
     """
        Calculate metrics for bbox predictions
-       """
+    """
     def calculate_iou_tensor(box1, box2):
         """Calculate IoU for two bounding boxes (PyTorch tensors)."""
         x1 = torch.max(box1[0], box2[0])

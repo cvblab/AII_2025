@@ -1,13 +1,10 @@
 import os
-import numpy as np
 from PIL import Image
-import glob
 import matplotlib.pyplot as plt
-from codebase.data.dataset import get_dataset_path,load_data
-import torch
 from torch.utils.data import DataLoader
-from transformers import SamProcessor, SamModel, AutoModel, AutoProcessor
+from transformers import SamProcessor
 from codebase.data.dataset import create_dataset, SegDataset, custom_collate_fn, get_dataset_path
+
 
 def convert_instance_masks_to_binary(images_dir,masks_dir, output_dir, visualize=True):
     os.makedirs(output_dir, exist_ok=True)
@@ -57,6 +54,7 @@ def convert_instance_masks_to_binary(images_dir,masks_dir, output_dir, visualize
             plt.show()
 
     print(f"Binary masks saved to: {output_dir}")
+
 
 if __name__ == "__main__":
     data = "neurips"  # aureus  dsb  mixed  breast subtilis neurips

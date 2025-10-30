@@ -1,5 +1,5 @@
 import torch
-from transformers import SamProcessor, SamModel, AutoModel, AutoProcessor
+from transformers import SamModel, AutoProcessor
 import os
 import numpy as np
 from codebase.utils.metrics import calculate_metrics,  average_precision
@@ -12,8 +12,32 @@ import sys
 import pandas as pd
 
 
-def predict_masks(DEVICE, model, model_processor, image, bboxes, test=False):
+def get_sam_model(DEVICE, backbone):
 
+    model_path = "facebook/sam-vit-" + backbone
+    model = SamModel.from_pretrained(model_path)
+    model_processor = AutoProcessor.from_pretrained(model_path)
+
+    for name, param in model.named_parameters():
+
+        if name.startswith(("vision_encoder", "prompt_encoder","image_encoder")):
+            param.requires_grad_(False)
+
+    # Set up optimizer
+    optimizer = torch.optim.Adam(model.mask_decoder.parameters(), lr=1e-5, weight_decay=0)
+    bce_loss_fn = nn.BCEWithLogitsLoss()
+    seg_loss = monai.losses.DiceCELoss(sigmoid=True, squared_pred=True, reduction='mean')
+    model.to(DEVICE)
+    model.train()
+
+    return model, model_processor, optimizer, bce_loss_fn, seg_loss
+
+
+
+def predict_masks(DEVICE, model, model_processor, image, bboxes, test=False):
+    """
+    Returns predictions for a single image
+    """
     result_masks = []
 
     for idx, box in enumerate(bboxes):
@@ -38,6 +62,7 @@ def predict_masks(DEVICE, model, model_processor, image, bboxes, test=False):
     else:
         result_masks = torch.stack(result_masks)[:, 0, :, :].float()
         return result_masks
+
 
 
 def train_sam(DEVICE, train_data, num_epochs, threshold, backbone, output_path):
@@ -112,6 +137,7 @@ def train_sam(DEVICE, train_data, num_epochs, threshold, backbone, output_path):
     plot_ap(average_precisions_list, num_epochs, output_path)
 
 
+
 def test_sam(DEVICE, data,test_data, sam_model_path, semantic_seg_model_path, yolo_path, tp_thresholds, nms_iou_threshold, backbone, semantic=False):
 
     model, model_processor, optimizer, bce_loss_fn, seg_loss = get_sam_model(DEVICE, backbone)
@@ -131,20 +157,20 @@ def test_sam(DEVICE, data,test_data, sam_model_path, semantic_seg_model_path, yo
 
         if test_sample["bounding_boxes"] is None:
             print(f"[WARNING] No bounding boxes for sample: {test_sample['image_path']}")
-            continue  # or handle accordingly
+            continue
 
         else:
             gt_bboxes = test_sample["bounding_boxes"].squeeze(0)
 
         gt_masks = test_sample['instance_gt_masks'].squeeze(0).float().to(DEVICE)
 
-        if semantic==True:
+        if semantic==True:  # YOLO predicts bounding boxes from a binary prediction mask
 
             binary_prediction, gt_binary_mask = predict_binary_mask(DEVICE, test_sample["image"].squeeze(0), test_sample['original_gt_masks'].float(), semantic_seg_model_path)
             plot_semantic_segmentation(binary_prediction, gt_binary_mask, test_sample["image"].squeeze(0).permute(2, 0, 1).to(DEVICE))
             yolo_boxes, confs = get_yolo_bboxes(binary_prediction, yolo_path)
 
-        else:
+        else:  # YOLO predicts bounding boxes directly from image
 
             yolo_boxes, confs = get_yolo_bboxes(test_sample["image"],yolo_path)
 
@@ -189,26 +215,6 @@ def test_sam(DEVICE, data,test_data, sam_model_path, semantic_seg_model_path, yo
 
     save_results_to_excel(results, model="sam", data=data)
 
-
-def get_sam_model(DEVICE, backbone):
-
-    model_path = "facebook/sam-vit-" + backbone
-    model = SamModel.from_pretrained(model_path)
-    model_processor = AutoProcessor.from_pretrained(model_path)
-
-    for name, param in model.named_parameters():
-
-        if name.startswith(("vision_encoder", "prompt_encoder","image_encoder")):
-            param.requires_grad_(False)
-
-    # Set up optimizer
-    optimizer = torch.optim.Adam(model.mask_decoder.parameters(), lr=1e-5, weight_decay=0)
-    bce_loss_fn = nn.BCEWithLogitsLoss()
-    seg_loss = monai.losses.DiceCELoss(sigmoid=True, squared_pred=True, reduction='mean')
-    model.to(DEVICE)
-    model.train()
-
-    return model, model_processor, optimizer, bce_loss_fn, seg_loss
 
 
 

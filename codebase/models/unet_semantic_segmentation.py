@@ -17,8 +17,8 @@ def combined_loss(pred, target, alpha=0.3):
     return alpha * bce_loss(pred, target) + (1 - alpha) * dice_loss(pred, target)
 
 
-
 def train_semantic_seg(DEVICE, train_data, num_epochs, output_path, patience=5, min_delta=1e-4, f1_threshold=0.90):
+
     print("Training U-net for semantic segmentation")
     model = smp.Unet(
         encoder_name="resnet34",
@@ -27,13 +27,9 @@ def train_semantic_seg(DEVICE, train_data, num_epochs, output_path, patience=5, 
         classes=1
     ).to(DEVICE)
 
-    criterion = nn.BCEWithLogitsLoss()
     dice_loss_fn = DiceLoss(mode='binary')
-
     optimizer = optim.Adam(model.parameters(), lr=1e-4)
-
     os.makedirs(output_path, exist_ok=True)
-
     best_f1 = 0
     patience_counter = 0
     losses = []
@@ -58,7 +54,6 @@ def train_semantic_seg(DEVICE, train_data, num_epochs, output_path, patience=5, 
 
                 optimizer.zero_grad()
                 pred = model(input_tensor.unsqueeze(0))
-                #loss = criterion(pred, gt_mask.unsqueeze(0))
                 loss = combined_loss(pred, gt_mask.unsqueeze(0))
                 loss.backward()
                 optimizer.step()
